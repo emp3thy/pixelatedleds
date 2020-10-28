@@ -2,5 +2,5 @@
     "board": "arduino:avr:nano",
     "configuration": "cpu=atmega328old",
     "programmer": "USBtinyISP",
-    "sketch": "AllEffects_FastLED.ino"
+    "sketch": "AllEffects_FastLED\\AllEffects_FastLED.ino"
 }

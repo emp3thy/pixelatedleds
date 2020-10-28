@@ -1,3 +1,5 @@
+#include <FastLED.h>
+
 void changeEffect() {
   gHue = 0;
   if (digitalRead (BUTTON) == HIGH) {
