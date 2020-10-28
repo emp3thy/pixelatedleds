@@ -31,6 +31,14 @@ void justWhite()
   FastLED.show();
 }
 
+void jusBlack()
+{
+  for (int i = 0; i < NUM_LEDS; i++ ) {
+    leds[i] = CHSV(254, 254, 0);
+  }
+  FastLED.show();
+}
+
 void confetti()
 {
   // random colored speckles that blink in and fade smoothly

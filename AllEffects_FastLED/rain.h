@@ -3,6 +3,24 @@
 byte rain[NUM_LEDS];
 int speed = 2;
 int rainTick=0;
+
+void updaterain() {
+  for (byte i = 0; i < NUM_COLS; i++) {
+    for (byte j = 0; j < NUM_ROWS; j++) {
+      byte layer = rain[XY(i, ((j + speed + random8(2) + NUM_ROWS) % NUM_ROWS))];   //fake scroll based on shift coordinate
+      // random8(2) add glitchy look
+      if (layer) {
+        leds[XY((NUM_COLS - 1) - i, (NUM_ROWS - 1) - j)] = CHSV(141, 255, BRIGHTNESS);
+      }
+    }
+  }
+
+  speed ++;
+  fadeToBlackBy(leds, NUM_LEDS, 40);
+  blurRows(leds, NUM_COLS, NUM_ROWS, 16);      //if you want
+  FastLED.show();
+} //updaterain
+
 void changepattern () {
   int rand1 = random16 (NUM_LEDS);
   int rand2 = random16 (NUM_LEDS);
@@ -30,19 +48,3 @@ void rainInit() {                               //init array of dots. run once
   }
 } //raininit
 
-void updaterain() {
-  for (byte i = 0; i < NUM_COLS; i++) {
-    for (byte j = 0; j < NUM_ROWS; j++) {
-      byte layer = rain[XY(i, ((j + speed + random8(2) + NUM_ROWS) % NUM_ROWS))];   //fake scroll based on shift coordinate
-      // random8(2) add glitchy look
-      if (layer) {
-        leds[XY((NUM_COLS - 1) - i, (NUM_ROWS - 1) - j)] = CHSV(141, 255, BRIGHTNESS);
-      }
-    }
-  }
-
-  speed ++;
-  fadeToBlackBy(leds, NUM_LEDS, 40);
-  blurRows(leds, NUM_COLS, NUM_ROWS, 16);      //if you want
-  FastLED.show();
-} //updaterain
