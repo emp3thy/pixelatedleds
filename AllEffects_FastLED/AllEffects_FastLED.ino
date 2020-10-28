@@ -21,12 +21,21 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 #include "pride.h"
 #include "rain.h"
 #include "fire.h"
+#include "noise.h"
 //end patterns
+typedef void (*SimplePatternList[])();
+SimplePatternList patterns = {pride, pacifica_loop, metaBalls, 
+                              make_fire, confetti, rainbow, justWhite, 
+                              changepattern, sinelon, bpm, rainbowWithGlitter};
+uint16_t timeDelay[] = {20, 20, 100, 
+                        100, 20, 20, 100, 
+                        30, 20, 20, 20};
+
 void setup()
 {
   delay(3000); // 3 second delay for boot recovery, and a moment of silence
   FastLED.addLeds<WS2811, PIN, GRB>(leds, NUM_LEDS)
-         .setCorrection(TypicalLEDStrip);
+      .setCorrection(TypicalLEDStrip);
   pinMode(2, INPUT_PULLUP);                                             // internal pull-up resistor
   attachInterrupt(digitalPinToInterrupt(BUTTON), changeEffect, CHANGE); // pressed
   FastLED.setBrightness(BRIGHTNESS);
@@ -42,69 +51,8 @@ void loop()
     EEPROM.write(1, selectedEffect);
   }
 
-  EVERY_N_MILLISECONDS(100)
+  EVERY_N_MILLISECONDS(timeDelay[selectedEffect])
   {
-    switch (selectedEffect)
-    {
-    case 2:
-      metaBalls();
-      break;
-    case 6:
-      justWhite();
-      break;
-    case 7:
-      updaterain();
-      break;
-    case 3:
-      make_fire();
-      break;
-    default:
-      break;
-    }
-  }
-
-  EVERY_N_MILLISECONDS(30)
-  {
-    if(selectedEffect==7)
-    {
-      changepattern();
-    }
-  }
-
-  EVERY_N_MILLISECONDS(20)
-  {
-    if(selectedEffect=1)
-    {
-      pacifica_loop();
-    }
-  }
-
-  EVERY_N_MILLISECONDS(50)
-  {
-    gHue++;
-    switch (selectedEffect)
-    {
-    case 5:
-      rainbow();
-      break;
-    case 10:
-      rainbowWithGlitter();
-      break;
-    case 4:
-      confetti();
-      break;
-    case 8:
-      sinelon();
-      break;
-    case 9:
-      bpm();
-      break;
-    default:
-      break;
-    }
-  }
-  if (selectedEffect == 0)
-  {
-    pride();
+    patterns[selectedEffect]();
   }
 }

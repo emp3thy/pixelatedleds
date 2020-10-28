@@ -2,7 +2,7 @@
 //*** Rain
 byte rain[NUM_LEDS];
 int speed = 2;
-
+int rainTick=0;
 void changepattern () {
   int rand1 = random16 (NUM_LEDS);
   int rand2 = random16 (NUM_LEDS);
@@ -10,6 +10,12 @@ void changepattern () {
   {
     rain[rand1] = 0;  //this will not change total number of dots
     rain[rand2] = 1;
+  }
+  rainTick++;
+  if(rainTick==2)
+  {
+    rainTick=0;
+    updaterain();
   }
 } //changepattern
 
