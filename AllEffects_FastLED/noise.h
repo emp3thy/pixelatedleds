@@ -213,7 +213,7 @@ uint16_t cloudNoise() {
   drawNoise(CloudColors_p);
 }
 
-uint16_t fireNoise() {
+void fireNoise() {
   noisespeedx = 6; // 24;
   noisespeedy = 4;
   noisespeedz = 15;

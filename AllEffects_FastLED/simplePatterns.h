@@ -38,7 +38,7 @@ void jusBlack()
   }
   FastLED.show();
 }
-
+/*
 void confetti()
 {
   // random colored speckles that blink in and fade smoothly
@@ -56,7 +56,7 @@ void sinelon()
   leds[pos] += CHSV( gHue, 255, 192);
   FastLED.show();
 }
-
+*/
 void bpm()
 {
   // colored stripes pulsing at a defined Beats-Per-Minute (BPM)
@@ -68,7 +68,7 @@ void bpm()
   }
   FastLED.show();
 }
-
+/*
 void juggle() {
   // eight colored dots, weaving in and out of sync with each other
   fadeToBlackBy( leds, NUM_LEDS, 20);
@@ -79,3 +79,4 @@ void juggle() {
   }
   FastLED.show();
 }
+*/

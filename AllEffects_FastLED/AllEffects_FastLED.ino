@@ -23,18 +23,7 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 #include "fire.h"
 #include "noise.h"
 //end patterns
-typedef void (*SimplePatternList[])();
-SimplePatternList patterns = {pride, pacifica_loop, metaBalls, 
-                              make_fire, lavaNoise, fireNoise, 
-                              rainbow, justWhite, partyNoise,
-                              changepattern, rainbowStripeNoise, bpm, 
-                              rainbowWithGlitter, jusBlack};
 
-uint16_t timeDelay[] = {20, 20, 100, 
-                        100, 50, 50, 
-                        20, 100, 50,
-                        30, 50, 20, 
-                        20, 100};
 
 void setup()
 {
@@ -48,6 +37,11 @@ void setup()
   selectedEffect = EEPROM.read(1);
 }
 
+uint16_t timeDelay[] = {20, 20, 100, 
+                        100, 50, 50, 
+                        20, 100, 50,
+                        30, 50, 20, 
+                        20, 100};
 void loop()
 {
   if (selectedEffect > 10 || selectedEffect < 0)
@@ -55,9 +49,56 @@ void loop()
     selectedEffect = 0;
     EEPROM.write(1, selectedEffect);
   }
-
+  
   EVERY_N_MILLISECONDS(timeDelay[selectedEffect])
   {
-    patterns[selectedEffect]();
+    switch(selectedEffect)
+    {
+      case 0:
+      pride();
+      break;
+      case 1:
+      pacifica_loop();
+      break;
+      case 2:
+      metaBalls();
+      break;
+      case 3: 
+      make_fire();
+      break;
+      case 4:
+      lavaNoise();
+      break;
+      case 5:
+      fireNoise();
+      break;
+      case 6:
+      rainbow();
+      gHue++;
+      break;
+      case 7:
+      justWhite();
+      break;
+      case 8:
+      partyNoise();
+      break;
+      case 9:
+      changepattern();
+      break;
+      case 10:
+      rainbowStripeNoise();
+      break;
+      case 11:
+      bpm();
+      gHue++;
+      break;
+      case 12:
+      rainbowWithGlitter();
+      gHue++;
+      break;
+      case 13:
+      jusBlack();
+      break;
+    }
   }
 }
