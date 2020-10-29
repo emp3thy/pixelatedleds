@@ -25,13 +25,16 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 //end patterns
 typedef void (*SimplePatternList[])();
 SimplePatternList patterns = {pride, pacifica_loop, metaBalls, 
-                              make_fire, confetti, rainbow, justWhite, 
-                              changepattern, sinelon, bpm, rainbowWithGlitter,
-                              jusBlack};
+                              make_fire, lavaNoise, fireNoise, 
+                              rainbow, justWhite, partyNoise,
+                              changepattern, rainbowStripeNoise, bpm, 
+                              rainbowWithGlitter, jusBlack};
+
 uint16_t timeDelay[] = {20, 20, 100, 
-                        100, 20, 20, 100, 
-                        30, 20, 20, 20,
-                        100};
+                        100, 50, 50, 
+                        20, 100, 50,
+                        30, 50, 20, 
+                        20, 100};
 
 void setup()
 {
