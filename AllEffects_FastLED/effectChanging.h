@@ -1,13 +1,21 @@
 #include <FastLED.h>
 
-void changeEffect() {
-  gHue = 0;
-  if (digitalRead (BUTTON) == HIGH) {
-    selectedEffect++;
-    fadeToBlackBy( leds, NUM_LEDS, 20);
-    FastLED.show();
+void changeEffect(byte effect,byte currentEffect)
+{
+  if (effect != currentEffect)
+  {
+    gHue = 0;
+    selectedEffect=effect;
     FastLED.setBrightness(BRIGHTNESS);
-    EEPROM.write(1, selectedEffect);
-    asm volatile ("  jmp 0");
+    EEPROM.write(2, effect);
+    asm volatile("  jmp 0");
   }
+}
+
+void convertToSelectedEffect(int resistence)
+{
+  byte result = resistence / 730;
+  if  (result>14)
+    result=14;
+  changeEffect(result, selectedEffect);
 }

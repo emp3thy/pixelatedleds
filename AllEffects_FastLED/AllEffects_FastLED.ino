@@ -1,3 +1,31 @@
+#include <bitswap.h>
+#include <chipsets.h>
+#include <color.h>
+#include <colorpalettes.h>
+#include <colorutils.h>
+#include <controller.h>
+#include <cpp_compat.h>
+#include <dmx.h>
+#include <fastled_config.h>
+#include <fastled_delay.h>
+#include <fastled_progmem.h>
+#include <FastLED.h>
+#include <fastpin.h>
+#include <fastspi_bitbang.h>
+#include <fastspi_dma.h>
+#include <fastspi_nop.h>
+#include <fastspi_ref.h>
+#include <fastspi_types.h>
+#include <fastspi.h>
+#include <hsv2rgb.h>
+#include <led_sysdefs.h>
+#include <lib8tion.h>
+#include <noise.h>
+#include <pixelset.h>
+#include <pixeltypes.h>
+#include <platforms.h>
+#include <power_mgt.h>
+
 #include <FastLED.h>
 #include <EEPROM.h>
 #include <avr/pgmspace.h>
@@ -25,79 +53,80 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 #include "noise.h"
 //end patterns
 
-
 void setup()
 {
   delay(3000); // 3 second delay for boot recovery, and a moment of silence
   FastLED.addLeds<WS2811, PIN, GRB>(leds, NUM_LEDS)
       .setCorrection(TypicalLEDStrip);
-  pinMode(2, INPUT_PULLUP);                                             // internal pull-up resistor
-  attachInterrupt(digitalPinToInterrupt(BUTTON), changeEffect, CHANGE); // pressed
+  pinMode(2, INPUT_PULLUP); // internal pull-up resistor
+  //attachInterrupt(digitalPinToInterrupt(BUTTON), changeEffect, CHANGE); // pressed
   FastLED.setBrightness(BRIGHTNESS);
   rainInit();
-  selectedEffect = EEPROM.read(1);
+  selectedEffect = EEPROM.read(2);
 }
 
-const uint16_t timeDelay[] PROGMEM= {20, 20, 100, 
-                        100, 50, 50, 
-                        20, 100, 50,
-                        30, 50, 20, 
-                        20, 100};
+const uint16_t timeDelay[] PROGMEM = {20, 20, 100,
+                                      100, 50, 50,
+                                      20, 100, 50,
+                                      30, 50, 20,
+                                      20, 100};
+
+
+
 void loop()
 {
-  if (selectedEffect > 10 || selectedEffect < 0)
+  EVERY_N_MILLISECONDS(100)
   {
-    selectedEffect = 0;
-    EEPROM.write(1, selectedEffect);
+    convertToSelectedEffect(analogRead(BUTTON));
   }
-  
+
   EVERY_N_MILLISECONDS(timeDelay[selectedEffect])
   {
-    switch(selectedEffect)
+    switch (selectedEffect)
     {
-      case 0:
+    case 0:
       pride();
       break;
-      case 1:
+    case 1:
       pacifica_loop();
       break;
-      case 2:
+    case 2:
       metaBalls();
       break;
-      case 3: 
+    case 3:
       make_fire();
       break;
-      case 4:
+    case 4:
       lavaNoise();
       break;
-      case 5:
+    case 5:
       fireNoise();
       break;
-      case 6:
+    case 6:
       rainbow();
       gHue++;
       break;
-      case 7:
+    case 7:
       justWhite();
       break;
-      case 8:
+    case 8:
       partyNoise();
       break;
-      case 9:
+    case 9:
       changepattern();
       break;
-      case 10:
+    case 10:
       rainbowStripeNoise();
       break;
-      case 11:
+    case 11:
       bpm();
       gHue++;
       break;
-      case 12:
+    case 12:
       rainbowWithGlitter();
       gHue++;
       break;
-      case 13:
+    case 13:
       jusBlack();
       break;
     }

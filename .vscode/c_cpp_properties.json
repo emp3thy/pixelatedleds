@@ -3,7 +3,9 @@
         {
             "name": "Win32",
             "includePath": [
-                "C:\\Users\\gethi\\OneDrive\\Documents\\Arduino\\libraries\\**"
+                "C:\\Users\\gethi\\OneDrive\\Code\\PixelatedLights\\LedPixelatedLights\\AllEffects_FastLED\\libraries\\FastLED-3.3.3",
+                "C:\\Users\\gethi\\OneDrive\\Documents\\Arduino\\libraries\\**",
+                "C:\\Users\\gethi\\OneDrive\\Code\\PixelatedLights\\LedPixelatedLights\\AllEffects_FastLED\\libraries\\**",
                 "C:\\Users\\gethi\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\**",
                 "C:\\Users\\gethi\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.3\\**"
             ],
