@@ -66,16 +66,14 @@ void setup()
 }
 
 const uint16_t timeDelay[] PROGMEM = {20, 20, 100,
-                                      100, 50, 50,
-                                      20, 100, 50,
-                                      30, 50, 20,
+                                      100, 100, 100,
+                                      20, 100, 100,
+                                      30, 100, 20,
                                       20, 100};
-
-
 
 void loop()
 {
-  EVERY_N_MILLISECONDS(100)
+  EVERY_N_MILLISECONDS(200)
   {
     convertToSelectedEffect(analogRead(BUTTON));
   }

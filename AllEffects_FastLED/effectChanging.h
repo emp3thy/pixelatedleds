@@ -14,7 +14,7 @@ void changeEffect(byte effect,byte currentEffect)
 
 void convertToSelectedEffect(int resistence)
 {
-  byte result = resistence / 730;
+  byte result = resistence / 70;
   if  (result>14)
     result=14;
   changeEffect(result, selectedEffect);
