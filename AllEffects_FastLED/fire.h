@@ -1,4 +1,5 @@
 #include <FastLED.h>
+#include <avr/pgmspace.h>
 // *** FIRE!
 
 #define  MAT_COL_MAJOR       /* define if matrix is column-major (that is pixel 1 is in the same column as pixel 0) */
@@ -9,20 +10,20 @@
 /* Display size; can be smaller than matrix size, and if so, you can move the origin.
    This allows you to have a small fire display on a large matrix sharing the display
    with other stuff. See README at Github. */
-const uint16_t rows = NUM_ROWS;
-const uint16_t cols = NUM_COLS;
-const uint16_t xorg = 0;
-const uint16_t yorg = 0;
+const uint16_t rows PROGMEM = NUM_ROWS;
+const uint16_t cols PROGMEM= NUM_COLS;
+const uint16_t xorg PROGMEM= 0;
+const uint16_t yorg PROGMEM= 0;
 
 /* Flare constants */
-const uint8_t flarerows = 2;    /* number of rows (from bottom) allowed to flare */
-const uint8_t maxflare = 8;     /* max number of simultaneous flares */
-const uint8_t flarechance = 50; /* chance (%) of a new flare (if there's room) */
-const uint8_t flaredecay = 15;  /* decay rate of flare radiation; 14 is good */
+const uint8_t flarerows PROGMEM= 2;    /* number of rows (from bottom) allowed to flare */
+const uint8_t maxflare PROGMEM= 8;     /* max number of simultaneous flares */
+const uint8_t flarechance PROGMEM= 50; /* chance (%) of a new flare (if there's room) */
+const uint8_t flaredecay PROGMEM= 15;  /* decay rate of flare radiation; 14 is good */
 
 
 /* This is the map of colors from coolest (black) to hottest. Want blue flames? Go for it! */
-const uint32_t colors[] = {
+const uint32_t colors[] PROGMEM= {
   0x000000,
   0x100000,
   0x300000,
@@ -35,7 +36,7 @@ const uint32_t colors[] = {
   0xC08000,
   0x807080
 };
-const uint8_t NCOLORS = (sizeof(colors) / sizeof(colors[0]));
+const uint8_t NCOLORS PROGMEM= (sizeof(colors) / sizeof(colors[0]));
 
 uint8_t pix[rows][cols];
 uint8_t nflare = 0;
@@ -53,8 +54,8 @@ uint32_t flare[maxflare];
 #define __MAT_BOTTOM
 #endif
 
-const uint8_t phy_h = NUM_COLS;
-const uint8_t phy_w = NUM_ROWS;
+const uint8_t phy_h PROGMEM= NUM_COLS;
+const uint8_t phy_w PROGMEM= NUM_ROWS;
 uint16_t pos( uint16_t col, uint16_t row ) {
   uint16_t phy_x = xorg + (uint16_t) row;
   uint16_t phy_y = yorg + (uint16_t) col;

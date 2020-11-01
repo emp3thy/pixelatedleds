@@ -1,5 +1,6 @@
 #include <FastLED.h>
 #include <EEPROM.h>
+#include <avr/pgmspace.h>
 #define NUM_LEDS 100
 CRGB leds[NUM_LEDS];
 #define PIN 5
@@ -37,7 +38,7 @@ void setup()
   selectedEffect = EEPROM.read(1);
 }
 
-uint16_t timeDelay[] = {20, 20, 100, 
+const uint16_t timeDelay[] PROGMEM= {20, 20, 100, 
                         100, 50, 50, 
                         20, 100, 50,
                         30, 50, 20, 
