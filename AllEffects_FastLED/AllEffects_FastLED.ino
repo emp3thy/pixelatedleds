@@ -27,6 +27,7 @@
 #include <power_mgt.h>
 
 #include <FastLED.h>
+#include <EEPROM.h>
 #include <avr/pgmspace.h>
 #define NUM_LEDS 100
 CRGB leds[NUM_LEDS];
@@ -56,12 +57,12 @@ void setup()
 {
   delay(3000); // 3 second delay for boot recovery, and a moment of silence
   FastLED.addLeds<WS2811, PIN, GRB>(leds, NUM_LEDS)
-         .setCorrection(TypicalLEDStrip);
+      .setCorrection(TypicalLEDStrip);
   pinMode(2, INPUT_PULLUP); // internal pull-up resistor
   //attachInterrupt(digitalPinToInterrupt(BUTTON), changeEffect, CHANGE); // pressed
   FastLED.setBrightness(BRIGHTNESS);
   rainInit();
-  selectedEffect = 0;
+  selectedEffect = EEPROM.read(2);
 }
 
 const uint16_t timeDelay[] PROGMEM = {20, 20, 100,
