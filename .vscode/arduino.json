@@ -3,5 +3,6 @@
     "configuration": "cpu=atmega328old",
     "programmer": "USBtinyISP",
     "sketch": "AllEffects_FastLED\\AllEffects_FastLED.ino",
+    "output": "build",
     "port": "COM5"
 }

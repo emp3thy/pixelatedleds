@@ -62,7 +62,7 @@ void setup()
   //attachInterrupt(digitalPinToInterrupt(BUTTON), changeEffect, CHANGE); // pressed
   FastLED.setBrightness(BRIGHTNESS);
   rainInit();
-  selectedEffect = EEPROM.read(2);
+  selectedEffect =EEPROM.read(2);
 }
 
 const uint16_t timeDelay[] PROGMEM = {20, 20, 100,
@@ -73,7 +73,7 @@ const uint16_t timeDelay[] PROGMEM = {20, 20, 100,
 
 void loop()
 {
-  EVERY_N_MILLISECONDS(200)
+  EVERY_N_MILLISECONDS(1000)
   {
     convertToSelectedEffect(analogRead(BUTTON));
   }
