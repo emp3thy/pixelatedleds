@@ -62,32 +62,41 @@ void setup()
   //attachInterrupt(digitalPinToInterrupt(BUTTON), changeEffect, CHANGE); // pressed
   FastLED.setBrightness(BRIGHTNESS);
   rainInit();
-  selectedEffect =EEPROM.read(2);
+  selectedEffect = 0;
 }
-
-const uint16_t timeDelay[] PROGMEM = {20, 20, 100,
-                                      100, 100, 100,
-                                      20, 100, 100,
-                                      30, 100, 20,
-                                      20, 100};
 
 void loop()
 {
-  EVERY_N_MILLISECONDS(1000)
-  {
-    convertToSelectedEffect(analogRead(BUTTON));
-  }
+  selectedEffect = convertToSelectedEffect(analogRead(BUTTON));
 
-  EVERY_N_MILLISECONDS(timeDelay[selectedEffect])
+  EVERY_N_MILLISECONDS(50)
   {
     switch (selectedEffect)
     {
-    case 0:
-      pride();
+    case 6:
+      rainbow();
+      gHue++;
       break;
-    case 1:
-      pacifica_loop();
+    default:
       break;
+    }
+  }
+  EVERY_N_MILLISECONDS(30)
+  {
+    switch (selectedEffect)
+    {
+    case 9:
+      changepattern();
+      break;
+    default:
+      break;
+    }
+  }
+
+  EVERY_N_MILLISECONDS(100)
+  {
+    switch (selectedEffect)
+    {
     case 2:
       metaBalls();
       break;
@@ -100,15 +109,32 @@ void loop()
     case 5:
       fireNoise();
       break;
-    case 6:
-      rainbow();
-      gHue++;
-      break;
     case 7:
       justWhite();
       break;
     case 8:
       partyNoise();
+      break;
+    case 10:
+      rainbowStripeNoise();
+      break;
+    case 13:
+      jusBlack();
+      break;
+    default:
+      break;
+    }
+  }
+
+  EVERY_N_MILLISECONDS(20)
+  {
+    switch (selectedEffect)
+    {
+    case 0:
+      pride();
+      break;
+    case 1:
+      pacifica_loop();
       break;
     case 9:
       changepattern();
@@ -124,8 +150,7 @@ void loop()
       rainbowWithGlitter();
       gHue++;
       break;
-    case 13:
-      jusBlack();
+    default:
       break;
     }
   }
