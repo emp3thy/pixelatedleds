@@ -27,7 +27,6 @@
 #include <power_mgt.h>
 
 #include <FastLED.h>
-#include <EEPROM.h>
 #include <avr/pgmspace.h>
 #define NUM_LEDS 100
 CRGB leds[NUM_LEDS];
@@ -92,7 +91,20 @@ void loop()
       break;
     }
   }
-
+EVERY_N_MILLISECONDS(150)
+{
+  switch (selectedEffect)
+    {
+      case 10:
+      rainbowStripeNoise();
+      break;
+    case 13:
+      jusBlack();
+      break;
+    default:
+      break;
+    }
+}
   EVERY_N_MILLISECONDS(100)
   {
     switch (selectedEffect)
@@ -115,13 +127,7 @@ void loop()
     case 8:
       partyNoise();
       break;
-    case 10:
-      rainbowStripeNoise();
-      break;
-    case 13:
-      jusBlack();
-      break;
-    default:
+       default:
       break;
     }
   }
@@ -138,9 +144,6 @@ void loop()
       break;
     case 9:
       changepattern();
-      break;
-    case 10:
-      rainbowStripeNoise();
       break;
     case 11:
       bpm();

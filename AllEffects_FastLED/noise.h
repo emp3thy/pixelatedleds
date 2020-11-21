@@ -165,7 +165,7 @@ void drawNoise(CRGBPalette16 palette,uint8_t hueReduce = 0) {
   // convert the noise data to colors in the LED array
   // using the current palette
   mapNoiseToLEDsUsingPalette(palette, hueReduce);
-
+  FastLED.show();
 }
 
 uint16_t rainbowNoise() {
