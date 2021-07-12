@@ -28,21 +28,21 @@
 
 #include <FastLED.h>
 #include <avr/pgmspace.h>
-#define NUM_LEDS 100
+#include "configuation.h"
+
 CRGB leds[NUM_LEDS];
 #define PIN 5
-
 #define BUTTON 2
 #define BRIGHTNESS 254
-#define NUM_ROWS 10
-#define NUM_COLS 10
+
+
 
 byte selectedEffect = -1;
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 
 //Patterns
 #include "effectChanging.h"
-#include "XY.h"
+#include "XYMatrix.h"
 #include "metaBalls.h"
 #include "simplePatterns.h"
 #include "pacifica.h"
@@ -54,11 +54,10 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 
 void setup()
 {
-  delay(3000); // 3 second delay for boot recovery, and a moment of silence
+  delay(3000); // 3 second delay for boot recoverye
   FastLED.addLeds<WS2811, PIN, GRB>(leds, NUM_LEDS)
       .setCorrection(TypicalLEDStrip);
   pinMode(2, INPUT_PULLUP); // internal pull-up resistor
-  //attachInterrupt(digitalPinToInterrupt(BUTTON), changeEffect, CHANGE); // pressed
   FastLED.setBrightness(BRIGHTNESS);
   rainInit();
   selectedEffect = 0;
@@ -91,20 +90,36 @@ void loop()
       break;
     }
   }
-EVERY_N_MILLISECONDS(150)
-{
-  switch (selectedEffect)
+  
+  EVERY_N_MILLISECONDS(150)
+  {
+    switch (selectedEffect)
     {
-      case 10:
+    case 10:
       rainbowStripeNoise();
       break;
     case 13:
       jusBlack();
       break;
+    case 17:
+      movePaletteToPalette();
+      break;
     default:
       break;
     }
-}
+  }
+  EVERY_N_SECONDS(5)
+  {
+    switch (selectedEffect)
+    {
+    case 17:
+      generateRandomTargetPalette();
+      break;
+    
+    default:
+      break;
+    }
+  }
   EVERY_N_MILLISECONDS(100)
   {
     switch (selectedEffect)
@@ -127,7 +142,7 @@ EVERY_N_MILLISECONDS(150)
     case 8:
       partyNoise();
       break;
-       default:
+    default:
       break;
     }
   }
@@ -142,9 +157,6 @@ EVERY_N_MILLISECONDS(150)
     case 1:
       pacifica_loop();
       break;
-    case 9:
-      changepattern();
-      break;
     case 11:
       bpm();
       gHue++;
@@ -152,6 +164,21 @@ EVERY_N_MILLISECONDS(150)
     case 12:
       rainbowWithGlitter();
       gHue++;
+      break;
+    case 14:
+      juggle();
+      break;
+    case 15:
+      sinelon();
+      break;
+    case 16:
+      confetti();
+      break;
+      case 17:
+      fadeIn();
+      break;
+      case 18:
+      fill_grad();
       break;
     default:
       break;

@@ -10,7 +10,7 @@ void updaterain() {
       byte layer = rain[XY(i, ((j + speed + random8(2) + NUM_ROWS) % NUM_ROWS))];   //fake scroll based on shift coordinate
       // random8(2) add glitchy look
       if (layer) {
-        leds[XY((NUM_COLS - 1) - i, (NUM_ROWS - 1) - j)] = CHSV(141, 255, BRIGHTNESS);
+        leds[XY(i,j)] = CHSV(141, 255, BRIGHTNESS);
       }
     }
   }
@@ -39,7 +39,7 @@ void changepattern () {
 
 void rainInit() {                               //init array of dots. run once
   for (int i = 0; i < NUM_LEDS; i++) {
-    if (random8(10) == 0) {
+    if (random8(15) == 0) {
       rain[i] = 1;  //random8(20) number of dots. decrease for more dots
     }
     else {

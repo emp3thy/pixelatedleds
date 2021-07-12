@@ -17,7 +17,7 @@ const uint16_t xorg = 0;
 const uint16_t yorg = 0;
 
 /* Flare constants */
-const uint8_t flarerows = 4;    /* number of rows (from bottom) allowed to flare */
+const uint8_t flarerows = 3;    /* number of rows (from bottom) allowed to flare */
 const uint8_t maxflare = 8;     /* max number of simultaneous flares */
 const uint8_t flarechance = 10; /* chance (%) of a new flare (if there's room) */
 const uint8_t flaredecay = 14;  /* decay rate of flare radiation; 14 is good */

@@ -11,14 +11,14 @@ void metaBalls()
   gHue=0;
   uint8_t bx1 = beatsin8(15, 0, NUM_COLS - 1, 0, 0);
   uint8_t by1 = beatsin8(18, 0, NUM_ROWS - 1, 0, 0);
-  uint8_t bx2 = beatsin8(28, 0, NUM_COLS - 1, 0, 16);
-  uint8_t by2 = beatsin8(23, 0, NUM_ROWS - 1, 0, 16);
-  uint8_t bx3 = beatsin8(30, 0, NUM_COLS - 1, 0, 32);
-  uint8_t by3 = beatsin8(24, 0, NUM_ROWS - 1, 0, 32);
-  uint8_t bx4 = beatsin8(17, 0, NUM_COLS - 1, 0, 64);
-  uint8_t by4 = beatsin8(25, 0, NUM_ROWS - 1, 0, 64);
-  uint8_t bx5 = beatsin8(19, 0, NUM_COLS - 1, 0, 85);
-  uint8_t by5 = beatsin8(21, 0, NUM_ROWS - 1, 0, 85);
+  uint8_t bx2 = beatsin8(28, 0, NUM_COLS - 1, 0, 4);
+  uint8_t by2 = beatsin8(23, 0, NUM_ROWS - 1, 0, 4);
+  uint8_t bx3 = beatsin8(30, 0, NUM_COLS - 1, 0, 8);
+  uint8_t by3 = beatsin8(24, 0, NUM_ROWS - 1, 0, 8);
+  uint8_t bx4 = beatsin8(17, 0, NUM_COLS - 1, 0, 16);
+  uint8_t by4 = beatsin8(25, 0, NUM_ROWS - 1, 0, 16);
+  uint8_t bx5 = beatsin8(19, 0, NUM_COLS - 1, 0, 22);
+  uint8_t by5 = beatsin8(21, 0, NUM_ROWS - 1, 0, 22);
 
   for (int i = 0; i < NUM_COLS; i++)    {
     for (int j = 0; j < NUM_ROWS; j++) {

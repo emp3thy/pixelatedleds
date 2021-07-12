@@ -1,8 +1,8 @@
 {
     "board": "arduino:avr:nano",
     "configuration": "cpu=atmega328old",
-    "programmer": "USBtinyISP",
-    "sketch": "AllEffects_FastLED\\AllEffects_FastLED.ino",
+    "programmer": "arduino:usbtinyisp",
+    "sketch": "AllEffects_FastLED\\SquareMatrix.ino",
     "output": ".\\build",
-    "port": "COM5"
+    "port": "COM3"
 }
