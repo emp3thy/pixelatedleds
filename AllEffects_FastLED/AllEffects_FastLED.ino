@@ -53,6 +53,7 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 #include "mondrian.h"
 #include "plasma.h"
 #include "aurora.h"
+#include "voronoi.h"
 //end patterns
 
 void setup()
@@ -150,6 +151,9 @@ void loop()
       break;
     case 8:
       partyNoise();
+      break;
+    case 22:
+      voronoi();
       break;
     default:
       break;
