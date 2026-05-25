@@ -28,6 +28,8 @@ void fadeIn() {
 
   random16_set_seed(millis());                                                      // Re-randomizing the random number seed for other routines.
 
+  FastLED.show();
+
 } // fadein()
 
 void rainbow()
