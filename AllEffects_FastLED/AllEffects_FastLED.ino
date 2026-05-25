@@ -28,7 +28,7 @@
 
 #include <FastLED.h>
 #include <avr/pgmspace.h>
-#include "configuation.h"
+#include "configuration.h"
 
 CRGB leds[NUM_LEDS];
 #define PIN 5
