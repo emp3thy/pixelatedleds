@@ -1,3 +1,5 @@
+#pragma once
+
 #include <FastLED.h>
 
 CRGBPalette16 currentPalette = PartyColors_p;

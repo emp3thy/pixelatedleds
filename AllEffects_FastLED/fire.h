@@ -1,3 +1,5 @@
+#pragma once
+
 #include "FastLED.h"
 
 /* MATRIX CONFIGURATION -- PLEASE SEE THE README (GITHUB LINK ABOVE) */

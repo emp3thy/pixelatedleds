@@ -1,3 +1,5 @@
+#pragma once
+
 #include <FastLED.h>
 
 // The 16 bit version of our coordinates

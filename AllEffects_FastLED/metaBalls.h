@@ -1,3 +1,6 @@
+#pragma once
+#include <FastLED.h>
+
 byte dist (uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)  {
   int a = y2 - y1;
   int b = x2 - x1;
