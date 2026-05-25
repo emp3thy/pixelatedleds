@@ -1,0 +1,41 @@
+name: Arduino compile
+
+on:
+  pull_request:
+    paths:
+      - "AllEffects_FastLED/**"
+      - ".github/workflows/compile.yml"
+  push:
+    branches: [main]
+    paths:
+      - "AllEffects_FastLED/**"
+      - ".github/workflows/compile.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  compile:
+    name: arduino-cli compile (uno)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install arduino-cli
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Install AVR core
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr
+
+      - name: Compile sketch
+        run: |
+          arduino-cli compile \
+            --fqbn arduino:avr:uno \
+            --warnings all \
+            --libraries AllEffects_FastLED/libraries \
+            AllEffects_FastLED
