@@ -19,8 +19,10 @@ static void voronoiInit() {
     voronoiSeeds[i].x = random8(NUM_COLS);
     voronoiSeeds[i].y = random8(NUM_ROWS);
     voronoiSeeds[i].hue = random8();
-    voronoiSeeds[i].dx = (int8_t)random8(3) - 1;
-    voronoiSeeds[i].dy = (int8_t)random8(3) - 1;
+    do {
+      voronoiSeeds[i].dx = (int8_t)random8(3) - 1;
+      voronoiSeeds[i].dy = (int8_t)random8(3) - 1;
+    } while (voronoiSeeds[i].dx == 0 && voronoiSeeds[i].dy == 0);
   }
   voronoiInited = true;
 }
