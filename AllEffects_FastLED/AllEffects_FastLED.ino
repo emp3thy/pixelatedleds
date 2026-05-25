@@ -50,6 +50,7 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 #include "rain.h"
 #include "fire.h"
 #include "noisePatterns.h"
+#include "mondrian.h"
 //end patterns
 
 void setup()
@@ -103,6 +104,9 @@ void loop()
       break;
     case 17:
       movePaletteToPalette();
+      break;
+    case 19:
+      mondrian();
       break;
     default:
       break;
