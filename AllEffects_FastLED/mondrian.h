@@ -4,6 +4,8 @@
 #include "XYMatrix.h"
 
 #define MONDRIAN_MAX_LEAVES 8
+#define MONDRIAN_MAX_DEPTH  2
+#define MONDRIAN_WORK_STACK 3
 
 struct MondrianLeaf {
   uint8_t x, y, w, h;
@@ -20,42 +22,60 @@ static CRGB mondrianPickColor() {
   if (r < 186) return CRGB(220, 0, 0);     // 13% red
   if (r < 219) return CRGB(240, 200, 0);   // 13% yellow
   if (r < 252) return CRGB(0, 0, 220);     // 13% blue
-  return CRGB(0, 0, 0);                    // 4% black
+  return CRGB(0, 0, 0);                    // ~1.5% black
 }
 
-static void mondrianSplit(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t depth) {
-  if (mondrianLeafCount >= MONDRIAN_MAX_LEAVES ||
-      depth >= 4 || (w <= 4 && h <= 2)) {
-    mondrianLeaves[mondrianLeafCount++] = { x, y, w, h, mondrianPickColor() };
-    return;
-  }
-  bool splitVert;
-  if (w >= 2 * h) splitVert = true;
-  else if (h >= 2 * w) splitVert = false;
-  else splitVert = random8(2);
-
-  if (splitVert && w >= 4) {
-    uint8_t at = random8(2, w - 1);
-    mondrianSplit(x, y, at, h, depth + 1);
-    mondrianSplit(x + at, y, w - at, h, depth + 1);
-  } else if (!splitVert && h >= 3) {
-    uint8_t at = random8(1, h - 1);
-    mondrianSplit(x, y, w, at, depth + 1);
-    mondrianSplit(x, y + at, w, h - at, depth + 1);
-  } else {
-    mondrianLeaves[mondrianLeafCount++] = { x, y, w, h, mondrianPickColor() };
-  }
+static void mondrianEmitLeaf(uint8_t x, uint8_t y, uint8_t w, uint8_t h) {
+  if (mondrianLeafCount >= MONDRIAN_MAX_LEAVES) return;
+  mondrianLeaves[mondrianLeafCount++] = { x, y, w, h, mondrianPickColor() };
 }
 
+// Iterative subdivision via a small explicit work stack — avoids deep recursion
+// that would overflow the AVR Uno's tiny SRAM stack budget (25 bytes free).
 static void mondrianRegen() {
+  struct WorkItem { uint8_t x, y, w, h, depth; };
+  WorkItem stack[MONDRIAN_WORK_STACK];
+  uint8_t sp = 0;
+
   mondrianLeafCount = 0;
-  mondrianSplit(0, 0, NUM_COLS, NUM_ROWS, 0);
-  mondrianLastRegen = millis();
+  stack[sp++] = { 0, 0, NUM_COLS, NUM_ROWS, 0 };
+
+  while (sp > 0 && mondrianLeafCount < MONDRIAN_MAX_LEAVES) {
+    WorkItem cur = stack[--sp];
+
+    if (cur.depth >= MONDRIAN_MAX_DEPTH || (cur.w <= 4 && cur.h <= 2)) {
+      mondrianEmitLeaf(cur.x, cur.y, cur.w, cur.h);
+      continue;
+    }
+
+    bool splitVert;
+    if (cur.w >= 2 * cur.h) splitVert = true;
+    else if (cur.h >= 2 * cur.w) splitVert = false;
+    else splitVert = random8(2);
+
+    bool didSplit = false;
+    if (splitVert && cur.w >= 4 && sp + 2 <= MONDRIAN_WORK_STACK) {
+      uint8_t at = random8(2, cur.w - 1);
+      stack[sp++] = { cur.x, cur.y, at, cur.h, (uint8_t)(cur.depth + 1) };
+      stack[sp++] = { (uint8_t)(cur.x + at), cur.y, (uint8_t)(cur.w - at), cur.h, (uint8_t)(cur.depth + 1) };
+      didSplit = true;
+    } else if (!splitVert && cur.h >= 3 && sp + 2 <= MONDRIAN_WORK_STACK) {
+      uint8_t at = random8(1, cur.h - 1);
+      stack[sp++] = { cur.x, cur.y, cur.w, at, (uint8_t)(cur.depth + 1) };
+      stack[sp++] = { cur.x, (uint8_t)(cur.y + at), cur.w, (uint8_t)(cur.h - at), (uint8_t)(cur.depth + 1) };
+      didSplit = true;
+    }
+
+    if (!didSplit) {
+      mondrianEmitLeaf(cur.x, cur.y, cur.w, cur.h);
+    }
+  }
 }
 
 void mondrian() {
   if (mondrianLastRegen == 0 || millis() - mondrianLastRegen > 10000) {
     mondrianRegen();
+    mondrianLastRegen = millis();
   }
   for (uint8_t i = 0; i < mondrianLeafCount; i++) {
     MondrianLeaf &L = mondrianLeaves[i];
