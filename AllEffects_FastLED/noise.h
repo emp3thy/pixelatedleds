@@ -186,7 +186,7 @@ void drawNoise(CRGBPalette16 palette, uint8_t hueReduce = 0)
   FastLED.show();
 }
 
-uint16_t rainbowNoise()
+void rainbowNoise()
 {
   noisespeedx = 9;
   noisespeedy = 0;
@@ -196,7 +196,7 @@ uint16_t rainbowNoise()
   drawNoise(RainbowColors_p);
 }
 
-uint16_t rainbowStripeNoise()
+void rainbowStripeNoise()
 {
   noisespeedx = 9;
   noisespeedy = 0;
@@ -206,7 +206,7 @@ uint16_t rainbowStripeNoise()
   drawNoise(RainbowStripeColors_p);
 }
 
-uint16_t partyNoise()
+void partyNoise()
 {
   noisespeedx = 9;
   noisespeedy = 0;
@@ -216,7 +216,7 @@ uint16_t partyNoise()
   drawNoise(PartyColors_p);
 }
 
-uint16_t forestNoise()
+void forestNoise()
 {
   noisespeedx = 9;
   noisespeedy = 0;
@@ -226,7 +226,7 @@ uint16_t forestNoise()
   drawNoise(ForestColors_p);
 }
 
-uint16_t cloudNoise()
+void cloudNoise()
 {
   noisespeedx = 9;
   noisespeedy = 0;
@@ -246,7 +246,7 @@ void fireNoise()
   drawNoise(HeatColors_p, 15);
 }
 
-uint16_t lavaNoise()
+void lavaNoise()
 {
   noisespeedx = 32;
   noisespeedy = 0;
@@ -256,7 +256,7 @@ uint16_t lavaNoise()
   drawNoise(LavaColors_p);
 }
 
-uint16_t oceanNoise()
+void oceanNoise()
 {
   noisespeedx = 9;
   noisespeedy = 0;
@@ -266,7 +266,7 @@ uint16_t oceanNoise()
   drawNoise(OceanColors_p);
 }
 
-uint16_t blackAndWhiteNoise()
+void blackAndWhiteNoise()
 {
   SetupBlackAndWhiteStripedPalette();
   noisespeedx = 9;
@@ -277,7 +277,7 @@ uint16_t blackAndWhiteNoise()
   drawNoise(blackAndWhiteStripedPalette);
 }
 
-uint16_t blackAndBlueNoise()
+void blackAndBlueNoise()
 {
   SetupBlackAndBlueStripedPalette();
   noisespeedx = 9;
