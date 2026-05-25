@@ -134,10 +134,12 @@ void mapNoiseToLEDsUsingPalette(CRGBPalette16 palette, uint8_t hueReduce = 0)
     for (int j = 0; j < NUM_COLS; j++)
     {
       // We use the value at the (i,j) coordinate in the noise
-      // array for our brightness, and the flipped value from (j,i)
-      // for our pixel's index into the color palette.
+      // array for both brightness and palette index — the brighten-up
+      // step below and the optional `colorLoop` ihue offset give some
+      // variation. (Previously `noise[j][i]` was used for index, but
+      // that read out-of-bounds because noise is [NUM_ROWS][NUM_COLS].)
 
-      uint8_t index = noise[j][i];
+      uint8_t index = noise[i][j];
       uint8_t bri = noise[i][j];
 
       // if this palette is a 'loop', add a slowly-changing base value
