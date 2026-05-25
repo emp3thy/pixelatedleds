@@ -36,7 +36,7 @@ void pride()
 
     CRGB newcolor = CHSV( hue8, sat8, bri8);
 
-    nblend( leds[i], newcolor, 64);
+    nblend( leds[(NUM_LEDS - 1) - i], newcolor, 64);
   }
   FastLED.show();
 }
