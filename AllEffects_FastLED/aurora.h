@@ -12,8 +12,8 @@ void aurora() {
       // horizontal shimmer band — two sines summed and scaled
       uint16_t bandSum = (uint16_t)sin8(x * 5 + t) + (uint16_t)sin8(x * 3 - t / 2);
       uint8_t band = bandSum / 2;
-      // hue: aurora green→violet range ~96..208; row offset adds vertical variation
-      uint8_t hue = 96 + (band >> 1) + (y * 8);
+      // hue: saturating add keeps aurora in green→violet range, no red wrap
+      uint8_t hue = qadd8(96, (band >> 1) + (y * 8));
       // brightness: combine row falloff with shimmer
       uint8_t bri = scale8(rowBri, qadd8(band, 40));
       leds[XY(x, y)] = CHSV(hue, 220, bri);
