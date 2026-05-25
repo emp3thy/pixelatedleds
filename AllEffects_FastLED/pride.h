@@ -36,10 +36,7 @@ void pride()
 
     CRGB newcolor = CHSV( hue8, sat8, bri8);
 
-    uint16_t pixelnumber = i;
-    pixelnumber = (NUM_LEDS - 1) - pixelnumber;
-
-    nblend( leds[pixelnumber], newcolor, 64);
+    nblend( leds[i], newcolor, 64);
   }
   FastLED.show();
 }

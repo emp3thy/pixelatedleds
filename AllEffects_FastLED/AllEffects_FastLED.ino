@@ -33,11 +33,11 @@
 CRGB leds[NUM_LEDS];
 #define PIN 5
 #define BUTTON 2
-#define BRIGHTNESS 254
+#define BRIGHTNESS 255
 
 
 
-byte selectedEffect = -1;
+byte selectedEffect = 0;
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 
 //Patterns
