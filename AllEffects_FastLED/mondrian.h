@@ -3,7 +3,7 @@
 #include "configuration.h"
 #include "XYMatrix.h"
 
-#define MONDRIAN_MAX_LEAVES 8
+#define MONDRIAN_MAX_LEAVES 6
 #define MONDRIAN_MAX_DEPTH  2
 #define MONDRIAN_WORK_STACK 3
 
@@ -31,17 +31,19 @@ static void mondrianEmitLeaf(uint8_t x, uint8_t y, uint8_t w, uint8_t h) {
 }
 
 // Iterative subdivision via a small explicit work stack — avoids deep recursion
-// that would overflow the AVR Uno's tiny SRAM stack budget (25 bytes free).
+// that would overflow the AVR Uno's tiny SRAM stack budget. The work-stack array
+// is `static` so it lives in .bss rather than on the hardware stack.
+struct MondrianWorkItem { uint8_t x, y, w, h, depth; };
+static MondrianWorkItem mondrianWorkStack[MONDRIAN_WORK_STACK];
+
 static void mondrianRegen() {
-  struct WorkItem { uint8_t x, y, w, h, depth; };
-  WorkItem stack[MONDRIAN_WORK_STACK];
   uint8_t sp = 0;
 
   mondrianLeafCount = 0;
-  stack[sp++] = { 0, 0, NUM_COLS, NUM_ROWS, 0 };
+  mondrianWorkStack[sp++] = { 0, 0, NUM_COLS, NUM_ROWS, 0 };
 
   while (sp > 0 && mondrianLeafCount < MONDRIAN_MAX_LEAVES) {
-    WorkItem cur = stack[--sp];
+    MondrianWorkItem cur = mondrianWorkStack[--sp];
 
     if (cur.depth >= MONDRIAN_MAX_DEPTH || (cur.w <= 4 && cur.h <= 2)) {
       mondrianEmitLeaf(cur.x, cur.y, cur.w, cur.h);
@@ -56,13 +58,13 @@ static void mondrianRegen() {
     bool didSplit = false;
     if (splitVert && cur.w >= 4 && sp + 2 <= MONDRIAN_WORK_STACK) {
       uint8_t at = random8(2, cur.w - 1);
-      stack[sp++] = { cur.x, cur.y, at, cur.h, (uint8_t)(cur.depth + 1) };
-      stack[sp++] = { (uint8_t)(cur.x + at), cur.y, (uint8_t)(cur.w - at), cur.h, (uint8_t)(cur.depth + 1) };
+      mondrianWorkStack[sp++] = { cur.x, cur.y, at, cur.h, (uint8_t)(cur.depth + 1) };
+      mondrianWorkStack[sp++] = { (uint8_t)(cur.x + at), cur.y, (uint8_t)(cur.w - at), cur.h, (uint8_t)(cur.depth + 1) };
       didSplit = true;
     } else if (!splitVert && cur.h >= 3 && sp + 2 <= MONDRIAN_WORK_STACK) {
       uint8_t at = random8(1, cur.h - 1);
-      stack[sp++] = { cur.x, cur.y, cur.w, at, (uint8_t)(cur.depth + 1) };
-      stack[sp++] = { cur.x, (uint8_t)(cur.y + at), cur.w, (uint8_t)(cur.h - at), (uint8_t)(cur.depth + 1) };
+      mondrianWorkStack[sp++] = { cur.x, cur.y, cur.w, at, (uint8_t)(cur.depth + 1) };
+      mondrianWorkStack[sp++] = { cur.x, (uint8_t)(cur.y + at), cur.w, (uint8_t)(cur.h - at), (uint8_t)(cur.depth + 1) };
       didSplit = true;
     }
 
