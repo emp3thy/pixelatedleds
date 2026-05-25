@@ -3,7 +3,7 @@
 #include "configuration.h"
 #include "XYMatrix.h"
 
-#define MONDRIAN_MAX_LEAVES 12
+#define MONDRIAN_MAX_LEAVES 8
 
 struct MondrianLeaf {
   uint8_t x, y, w, h;
