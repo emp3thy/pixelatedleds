@@ -1,1 +1,11 @@
-build/*
+build/
+*.elf
+*.hex
+*.eep
+*.bin
+*.o
+*.d
+*.with_bootloader.bin
+*.with_bootloader.hex
+.vscode/
+.idea/
