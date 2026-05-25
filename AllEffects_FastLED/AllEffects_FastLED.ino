@@ -49,7 +49,7 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 #include "pride.h"
 #include "rain.h"
 #include "fire.h"
-#include "noise.h"
+#include "noisePatterns.h"
 //end patterns
 
 void setup()
