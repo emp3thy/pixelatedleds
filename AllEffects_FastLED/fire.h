@@ -161,14 +161,10 @@ void make_fire()
     }
   }
 
-  // Heat the bottom row
+  // Heat the bottom row — always reseed so cold cells reignite
   for (j = 0; j < cols; ++j)
   {
-    i = pix[0][j];
-    if (i > 0)
-    {
-      pix[0][j] = random(NCOLORS - 6, NCOLORS - 2);
-    }
+    pix[0][j] = random(NCOLORS - 6, NCOLORS - 2);
   }
 
   // flare
