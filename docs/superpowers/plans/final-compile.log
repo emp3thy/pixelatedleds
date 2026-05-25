@@ -1,0 +1,10 @@
+C:\Users\gethi\source\pixelatedlights\AllEffects_FastLED\noisePatterns.h: In function 'drawNoise':
+C:\Users\gethi\source\pixelatedlights\AllEffects_FastLED\noisePatterns.h:140:15: warning: iteration 6 invokes undefined behavior [-Waggressive-loop-optimizations]
+       uint8_t index = noise[j][i];
+               ^
+C:\Users\gethi\source\pixelatedlights\AllEffects_FastLED\noisePatterns.h:134:23: note: within this loop
+     for (int j = 0; j < NUM_COLS; j++)
+                       ^
+Sketch uses 15052 bytes (46%) of program storage space. Maximum is 32256 bytes.
+Global variables use 1911 bytes (93%) of dynamic memory, leaving 137 bytes for local variables. Maximum is 2048 bytes.
+Low memory available, stability problems may occur.

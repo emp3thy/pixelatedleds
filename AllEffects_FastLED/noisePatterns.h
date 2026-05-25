@@ -1,3 +1,5 @@
+#pragma once
+
 #include <FastLED.h>
 
 // The 16 bit version of our coordinates
@@ -132,10 +134,12 @@ void mapNoiseToLEDsUsingPalette(CRGBPalette16 palette, uint8_t hueReduce = 0)
     for (int j = 0; j < NUM_COLS; j++)
     {
       // We use the value at the (i,j) coordinate in the noise
-      // array for our brightness, and the flipped value from (j,i)
-      // for our pixel's index into the color palette.
+      // array for both brightness and palette index — the brighten-up
+      // step below and the optional `colorLoop` ihue offset give some
+      // variation. (Previously `noise[j][i]` was used for index, but
+      // that read out-of-bounds because noise is [NUM_ROWS][NUM_COLS].)
 
-      uint8_t index = noise[j][i];
+      uint8_t index = noise[i][j];
       uint8_t bri = noise[i][j];
 
       // if this palette is a 'loop', add a slowly-changing base value
@@ -164,9 +168,9 @@ void mapNoiseToLEDsUsingPalette(CRGBPalette16 palette, uint8_t hueReduce = 0)
       }
 
       CRGB color = ColorFromPalette(palette, index, bri);
-      uint16_t n = XY(i, j);
+      uint16_t n = XY(j, i);
 
-      if (n > -1 && n < NUM_ROWS)
+      if (n < NUM_LEDS)
       {
         leds[n] = color;
       }
@@ -186,7 +190,7 @@ void drawNoise(CRGBPalette16 palette, uint8_t hueReduce = 0)
   FastLED.show();
 }
 
-uint16_t rainbowNoise()
+void rainbowNoise()
 {
   noisespeedx = 9;
   noisespeedy = 0;
@@ -196,7 +200,7 @@ uint16_t rainbowNoise()
   drawNoise(RainbowColors_p);
 }
 
-uint16_t rainbowStripeNoise()
+void rainbowStripeNoise()
 {
   noisespeedx = 9;
   noisespeedy = 0;
@@ -206,7 +210,7 @@ uint16_t rainbowStripeNoise()
   drawNoise(RainbowStripeColors_p);
 }
 
-uint16_t partyNoise()
+void partyNoise()
 {
   noisespeedx = 9;
   noisespeedy = 0;
@@ -216,7 +220,7 @@ uint16_t partyNoise()
   drawNoise(PartyColors_p);
 }
 
-uint16_t forestNoise()
+void forestNoise()
 {
   noisespeedx = 9;
   noisespeedy = 0;
@@ -226,7 +230,7 @@ uint16_t forestNoise()
   drawNoise(ForestColors_p);
 }
 
-uint16_t cloudNoise()
+void cloudNoise()
 {
   noisespeedx = 9;
   noisespeedy = 0;
@@ -246,7 +250,7 @@ void fireNoise()
   drawNoise(HeatColors_p, 15);
 }
 
-uint16_t lavaNoise()
+void lavaNoise()
 {
   noisespeedx = 32;
   noisespeedy = 0;
@@ -256,7 +260,7 @@ uint16_t lavaNoise()
   drawNoise(LavaColors_p);
 }
 
-uint16_t oceanNoise()
+void oceanNoise()
 {
   noisespeedx = 9;
   noisespeedy = 0;
@@ -266,7 +270,7 @@ uint16_t oceanNoise()
   drawNoise(OceanColors_p);
 }
 
-uint16_t blackAndWhiteNoise()
+void blackAndWhiteNoise()
 {
   SetupBlackAndWhiteStripedPalette();
   noisespeedx = 9;
@@ -277,7 +281,7 @@ uint16_t blackAndWhiteNoise()
   drawNoise(blackAndWhiteStripedPalette);
 }
 
-uint16_t blackAndBlueNoise()
+void blackAndBlueNoise()
 {
   SetupBlackAndBlueStripedPalette();
   noisespeedx = 9;

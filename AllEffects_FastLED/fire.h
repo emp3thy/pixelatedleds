@@ -1,3 +1,5 @@
+#pragma once
+
 #include "FastLED.h"
 
 /* MATRIX CONFIGURATION -- PLEASE SEE THE README (GITHUB LINK ABOVE) */
@@ -11,8 +13,8 @@
 /* Display size; can be smaller than matrix size, and if so, you can move the origin.
  * This allows you to have a small fire display on a large matrix sharing the display
  * with other stuff. See README at Github. */
-const uint16_t rows = NUM_ROWS;
-const uint16_t cols = NUM_COLS;
+const uint16_t fireRows = NUM_ROWS;
+const uint16_t fireCols = NUM_COLS;
 const uint16_t xorg = 0;
 const uint16_t yorg = 0;
 
@@ -37,7 +39,7 @@ const uint32_t colors[] = {
     0x807080};
 const uint8_t NCOLORS = (sizeof(colors) / sizeof(colors[0]));
 
-uint8_t pix[rows][cols];
+uint8_t pix[fireRows][fireCols];
 
 uint8_t nflare = 0;
 uint32_t flare[maxflare];
@@ -107,7 +109,7 @@ void glow(int x, int y, int z)
   {
     for (int j = (x - b); j < (x + b); ++j)
     {
-      if (i >= 0 && j >= 0 && i < rows && j < cols)
+      if (i >= 0 && j >= 0 && i < fireRows && j < fireCols)
       {
         int d = (flaredecay * isqrt((x - j) * (x - j) + (y - i) * (y - i)) + 5) / 10;
         uint8_t n = 0;
@@ -126,7 +128,7 @@ void newflare()
 {
   if (nflare < maxflare && random(1, 101) <= flarechance)
   {
-    int x = random(0, cols);
+    int x = random(0, fireCols);
     int y = random(0, flarerows);
     int z = NCOLORS - 1;
     flare[nflare++] = (z << 16) | (y << 8) | (x & 0xff);
@@ -141,18 +143,18 @@ void newflare()
  *  call it frequently enough, the refresh rate may be lower than
  *  configured.
  */
-unsigned long t = 0; /* keep time */
+unsigned long fireNextMs = 0; /* keep time */
 void make_fire()
 {
   uint16_t i, j;
-  if (t > millis())
+  if (fireNextMs > millis())
     return;
-  t = millis() + (1000 / FPS);
+  fireNextMs = millis() + (1000 / FPS);
 
   // First, move all existing heat points up the display and fade
-  for (i = rows - 1; i > 0; --i)
+  for (i = fireRows - 1; i > 0; --i)
   {
-    for (j = 0; j < cols; ++j)
+    for (j = 0; j < fireCols; ++j)
     {
       uint8_t n = 0;
       if (pix[i - 1][j] > 0)
@@ -161,14 +163,10 @@ void make_fire()
     }
   }
 
-  // Heat the bottom row
-  for (j = 0; j < cols; ++j)
+  // Heat the bottom row — always reseed so cold cells reignite
+  for (j = 0; j < fireCols; ++j)
   {
-    i = pix[0][j];
-    if (i > 0)
-    {
-      pix[0][j] = random(NCOLORS - 6, NCOLORS - 2);
-    }
+    pix[0][j] = random(NCOLORS - 6, NCOLORS - 2);
   }
 
   // flare
@@ -195,9 +193,9 @@ void make_fire()
   newflare();
 
   // Set and draw
-  for (i = 0; i < rows; ++i)
+  for (i = 0; i < fireRows; ++i)
   {
-    for (j = 0; j < cols; ++j)
+    for (j = 0; j < fireCols; ++j)
     {
       leds[pos(j, i)] = colors[pix[i][j]];
     }

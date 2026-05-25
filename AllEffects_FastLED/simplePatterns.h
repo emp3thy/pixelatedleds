@@ -1,3 +1,5 @@
+#pragma once
+
 #include <FastLED.h>
 
 CRGBPalette16 currentPalette = PartyColors_p;
@@ -27,6 +29,8 @@ void fadeIn() {
   }
 
   random16_set_seed(millis());                                                      // Re-randomizing the random number seed for other routines.
+
+  FastLED.show();
 
 } // fadein()
 
