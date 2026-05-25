@@ -164,9 +164,9 @@ void mapNoiseToLEDsUsingPalette(CRGBPalette16 palette, uint8_t hueReduce = 0)
       }
 
       CRGB color = ColorFromPalette(palette, index, bri);
-      uint16_t n = XY(i, j);
+      uint16_t n = XY(j, i);
 
-      if (n > -1 && n < NUM_ROWS)
+      if (n < NUM_LEDS)
       {
         leds[n] = color;
       }
