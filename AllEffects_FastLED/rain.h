@@ -1,7 +1,7 @@
 #include <FastLED.h>
 //*** Rain
 byte rain[NUM_LEDS];
-int speed = 2;
+byte speed = 2;
 int rainTick=0;
 
 void updaterain() {
@@ -15,7 +15,7 @@ void updaterain() {
     }
   }
 
-  speed ++;
+  speed = (speed + 1) % NUM_ROWS;
   fadeToBlackBy(leds, NUM_LEDS, 40);
   blurRows(leds, NUM_COLS, NUM_ROWS, 16);      //if you want
   FastLED.show();
