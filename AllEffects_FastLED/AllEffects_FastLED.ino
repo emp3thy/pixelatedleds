@@ -50,6 +50,10 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 #include "rain.h"
 #include "fire.h"
 #include "noisePatterns.h"
+#include "mondrian.h"
+#include "plasma.h"
+#include "aurora.h"
+#include "voronoi.h"
 //end patterns
 
 void setup()
@@ -74,6 +78,9 @@ void loop()
     case 6:
       rainbow();
       gHue++;
+      break;
+    case 20:
+      plasma();
       break;
     default:
       break;
@@ -103,6 +110,9 @@ void loop()
       break;
     case 17:
       movePaletteToPalette();
+      break;
+    case 19:
+      mondrian();
       break;
     default:
       break;
@@ -142,6 +152,9 @@ void loop()
     case 8:
       partyNoise();
       break;
+    case 22:
+      voronoi();
+      break;
     default:
       break;
     }
@@ -179,6 +192,9 @@ void loop()
       break;
       case 18:
       fill_grad();
+      break;
+    case 21:
+      aurora();
       break;
     default:
       break;
