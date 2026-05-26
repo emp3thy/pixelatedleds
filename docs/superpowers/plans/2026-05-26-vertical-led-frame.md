@@ -848,12 +848,14 @@ def run(_context: str):
     led_frame_comp = led_frame_body.parentComponent
 
     # Top face Y = body bbox max Y. Cut new holes at (X corner offset 12.5mm, Z corner offset 5.5mm).
-    # LED Frame world XZ corners: (-50, -165), (110, -165), (110, -5), (-50, -5). Centre offset (12.5, 5.5).
+    # LED Frame world XZ corners (in CM — Fusion API internal): (-5, -16.5), (11, -16.5), (11, -0.5), (-5, -0.5).
+    # Corner offset 12.5mm = 1.25cm in X, 5.5mm = 0.55cm in Z.
+    # IMPORTANT: Fusion API uses cm internally. Numbers below are cm.
     new_hole_centers_world = [
-        (-50 + 1.25, -165 + 0.55),
-        ( 110 - 1.25, -165 + 0.55),
-        ( 110 - 1.25,  -5  - 0.55),
-        (-50 + 1.25,  -5  - 0.55),
+        (-5 + 1.25, -16.5 + 0.55),
+        ( 11 - 1.25, -16.5 + 0.55),
+        ( 11 - 1.25, -0.5  - 0.55),
+        (-5 + 1.25, -0.5  - 0.55),
     ]
     # 1) Cut new 10x3mm rectangles into top face at the new positions
     sk = led_frame_comp.sketches.add(led_frame_comp.xZConstructionPlane)
@@ -875,13 +877,13 @@ def run(_context: str):
     led_frame_comp.features.extrudeFeatures.add(cut_input)
     print('Cut new top-face hole at (12.5, 5.5) corner offset')
 
-    # 2) Fill the old holes at (7.5, 7.5) by extruding new material at those positions.
-    # This is a "if no longer needed, fill in" step. Old hole positions:
+    # 2) Fill the old holes at (7.5mm, 7.5mm) corner offset = (0.75cm, 0.75cm) by extruding new material.
+    # All numbers in cm (Fusion API internal unit).
     old_hole_centers_world = [
-        (-50 + 0.75, -165 + 0.75),
-        ( 110 - 0.75, -165 + 0.75),
-        ( 110 - 0.75,  -5  - 0.75),
-        (-50 + 0.75,  -5  - 0.75),
+        (-5 + 0.75, -16.5 + 0.75),
+        ( 11 - 0.75, -16.5 + 0.75),
+        ( 11 - 0.75, -0.5  - 0.75),
+        (-5 + 0.75, -0.5  - 0.75),
     ]
     sk2 = led_frame_comp.sketches.add(led_frame_comp.xZConstructionPlane)
     lines2 = sk2.sketchCurves.sketchLines
