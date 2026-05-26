@@ -702,12 +702,13 @@ def run(_context: str):
     # IMPORTANT: Fusion API uses CM internally — all coords below in cm.
     # OLD peg centres (corner offset 7.5mm): (-42.5, -157.5), (102.5, -157.5), (102.5, -12.5), (-42.5, -12.5) mm
     #                                       = (-4.25, -15.75), (10.25, -15.75), (10.25, -1.25), (-4.25, -1.25) cm
-    # NEW peg centres (corner offset 12.5mm, 5.5mm): (-37.5, -160.95), (107.5, -160.95), (107.5, -9.05), (-37.5, -9.05) mm
-    #                                                = (-3.75, -16.095), (10.75, -16.095), (10.75, -0.905), (-3.75, -0.905) cm
+    # NEW peg centres (corner offset 12.5mm, 5.5mm):
+    #   X: -5 + 1.25 = -3.75 cm (left wall) ; 11 - 1.25 = 9.75 cm (right wall)
+    #   Z: -16.5 + 0.55 = -15.95 cm (back wall) ; -0.5 - 0.55 = -1.05 cm (front wall)
     bb = led_frame_body.boundingBox
     base_y = bb.minPoint.y      # bottom face of frame body
     old_peg_centers = [(-4.25, -15.75), (10.25, -15.75), (10.25, -1.25), (-4.25, -1.25)]
-    new_peg_centers = [(-3.75, -16.095), (10.75, -16.095), (10.75, -0.905), (-3.75, -0.905)]
+    new_peg_centers = [(-3.75, -15.95), (9.75, -15.95), (9.75, -1.05), (-3.75, -1.05)]
 
     sk = led_frame_comp.sketches.add(led_frame_comp.xZConstructionPlane)
     lines = sk.sketchCurves.sketchLines
