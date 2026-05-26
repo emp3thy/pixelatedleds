@@ -13,8 +13,9 @@
 // caps NUM_ROWS at 4–5. NUM_ROWS=4 fits with margin.
 //
 // For taller towers move to a board with more SRAM:
-//   Arduino Mega 2560 (8KB SRAM): NUM_ROWS up to ~60 → 12cm strip → 7 frames.
-//   ESP32 (320KB SRAM): essentially unlimited.
+//   Arduino Mega 2560 (8KB SRAM): (8192 - 1380) / 3 / 44 ≈ 51 LEDs/strip
+//     → 51 × 16.67mm = 850 mm strip → ~17 frames of 48mm each.
+//   ESP32 (320KB SRAM): NUM_ROWS limited only by physical strip length, not SRAM.
 #define NUM_COLS 44
 #define NUM_ROWS 4
 #define NUM_LEDS 176

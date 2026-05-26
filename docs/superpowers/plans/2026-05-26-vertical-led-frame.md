@@ -698,33 +698,35 @@ def run(_context: str):
     led_frame_body = next(b for b in walk(root) if b.name == 'LED Frame')
     led_frame_comp = led_frame_body.parentComponent
 
-    # World peg locations relative to LED Frame's body (X bbox -50..110, Z bbox -165..-5).
-    # Peg centres (existing): at corner offsets ~7.5 mm inward. From earlier measurement:
-    #   (-42.5, ?, -157.5), (102.5, ?, -157.5), (102.5, ?, -12.5), (-42.5, ?, -12.5).
-    # We use these world XZ positions and remove a 12 × 6 × 6 mm box at each (slightly larger than old peg).
+    # World peg locations relative to LED Frame's body (X bbox -50..110mm = -5..11cm, Z bbox -165..-5mm = -16.5..-0.5cm).
+    # IMPORTANT: Fusion API uses CM internally — all coords below in cm.
+    # OLD peg centres (corner offset 7.5mm): (-42.5, -157.5), (102.5, -157.5), (102.5, -12.5), (-42.5, -12.5) mm
+    #                                       = (-4.25, -15.75), (10.25, -15.75), (10.25, -1.25), (-4.25, -1.25) cm
+    # NEW peg centres (corner offset 12.5mm, 5.5mm): (-37.5, -160.95), (107.5, -160.95), (107.5, -9.05), (-37.5, -9.05) mm
+    #                                                = (-3.75, -16.095), (10.75, -16.095), (10.75, -0.905), (-3.75, -0.905) cm
     bb = led_frame_body.boundingBox
     base_y = bb.minPoint.y      # bottom face of frame body
-    peg_world_centers = [(-4.25, -15.75), (10.25, -15.75), (10.25, -1.25), (-4.25, -1.25)]
+    old_peg_centers = [(-4.25, -15.75), (10.25, -15.75), (10.25, -1.25), (-4.25, -1.25)]
+    new_peg_centers = [(-3.75, -16.095), (10.75, -16.095), (10.75, -0.905), (-3.75, -0.905)]
 
     sk = led_frame_comp.sketches.add(led_frame_comp.xZConstructionPlane)
     lines = sk.sketchCurves.sketchLines
-    # Larger-than-peg removal rectangles: 12 mm x 6 mm
-    for cx, cz in peg_world_centers:
+    # Larger-than-peg removal rectangles: 12 mm x 6 mm = 1.2 cm x 0.6 cm
+    for cx, cz in old_peg_centers:
         p1 = adsk.core.Point3D.create(cx - 0.6, cz - 0.3, 0)
         p2 = adsk.core.Point3D.create(cx + 0.6, cz + 0.3, 0)
         lines.addTwoPointRectangle(p1, p2)
     profs = adsk.core.ObjectCollection.create()
     for k in range(sk.profiles.count): profs.add(sk.profiles.item(k))
     cut_input = led_frame_comp.features.extrudeFeatures.createInput(profs, CUT)
-    # Cut downward from base_y - 0.1 to body - extend below by 6mm
     cut_input.setDistanceExtent(False, val_str('-7 mm'))
     led_frame_comp.features.extrudeFeatures.add(cut_input)
-    print('Removed existing peg material (12x6mm at 4 corners)')
+    print('Removed existing peg material at OLD positions (12x6mm at 4 corners)')
 
-    # Now add new pegs (9.8 x 2.8 x 4.9 mm) at same XZ centres
+    # Now add new pegs (9.8 x 2.8 x 4.9 mm) at NEW corner-offset positions (12.5mm, 5.5mm).
     sk2 = led_frame_comp.sketches.add(led_frame_comp.xZConstructionPlane)
     lines2 = sk2.sketchCurves.sketchLines
-    for cx, cz in peg_world_centers:
+    for cx, cz in new_peg_centers:
         p1 = adsk.core.Point3D.create(cx - 0.49, cz - 0.14, 0)
         p2 = adsk.core.Point3D.create(cx + 0.49, cz + 0.14, 0)
         lines2.addTwoPointRectangle(p1, p2)
@@ -733,7 +735,7 @@ def run(_context: str):
     add_input = led_frame_comp.features.extrudeFeatures.createInput(profs2, JOIN)
     add_input.setDistanceExtent(False, val_str('-4.9 mm'))
     led_frame_comp.features.extrudeFeatures.add(add_input)
-    print('Added new pegs (9.8 x 2.8 x 4.9 mm)')
+    print('Added new pegs (9.8 x 2.8 x 4.9 mm) at NEW corner-offset positions')
 ```
 
 - [ ] **Step 4: Verify each LED Frame peg has the new dimensions**
