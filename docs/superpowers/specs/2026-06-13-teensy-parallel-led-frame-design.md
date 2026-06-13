@@ -137,11 +137,13 @@ No new enclosure. Everything lives in the **existing model**.
 - **Routing:** add cable channels / grommet through the existing base and VFrame
   for the 4 data lines and the 12 V bus taps.
 
-### ⚠ Open risk — PSU fit
-A 1000 W PSU (~218 × 113 × 38 mm) likely will **not** fit the ~200 mm base
-interior. Decision required in the plan: extend/enlarge the base, use an external
-PSU enclosure, or select a lower-profile supply. This blocks finalizing the CAD
-and the PSU line of the BOM.
+### PSU mounting — vertical
+The ~1000 W PSU (~218 × 113 × 38 mm) is mounted **vertically** (standing on its
+113 × 38 mm end). That footprint fits the interior cavity (~144 × 144 mm) with
+room to spare, and 218 mm of height is trivial within the 4 ft tower — so it
+fits without enlarging the base. Plan action: confirm 218 mm of unobstructed
+vertical clearance in the lower cavity (clear of the base-top pegs and the first
+LED frame) and add PSU mounting features in the model.
 
 ## 6. Bill of Materials
 
@@ -178,6 +180,8 @@ Exact quantities and part links finalized in the implementation plan.
 - **Color order** — RGBCalibrate on the first WS2815 strip to confirm GRB.
 
 ## 8. Open Items
-1. **PSU physical fit** in the base (§5) — blocks CAD + PSU BOM line.
+1. **PSU vertical clearance** (§5) — confirm 218 mm unobstructed vertical run in
+   the lower cavity (clear of base-top pegs and the first LED frame); add mounting
+   features. No longer a blocker — orientation decided (vertical).
 2. **WS2815 color order** — confirm GRB on first strip.
 3. **Serpentine parity** in `XY()` — confirm against actual wiring direction.
