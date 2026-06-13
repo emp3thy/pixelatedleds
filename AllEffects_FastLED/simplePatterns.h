@@ -36,8 +36,18 @@ void fadeIn() {
 
 void rainbow()
 {
-  // FastLED's built-in rainbow generator
-  fill_rainbow( leds, NUM_LEDS, gHue, 7);
+  // Spatial rainbow: hue follows column position (x), not raw array order.
+  // fill_rainbow() walks leds[] in memory order, which is lane-major + serpentine,
+  // so it produces vertical chevron stripes. Map through XY() instead so the
+  // spectrum sweeps smoothly around the tower and scrolls with gHue.
+  for (uint8_t x = 0; x < NUM_COLS; x++)
+  {
+    uint8_t hue = gHue + (uint8_t)((uint16_t)x * 255 / NUM_COLS);
+    for (uint8_t y = 0; y < NUM_ROWS; y++)
+    {
+      leds[XY(x, y)] = CHSV(hue, 255, 255);
+    }
+  }
   FastLED.show();
 }
 
