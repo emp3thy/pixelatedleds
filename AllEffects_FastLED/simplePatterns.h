@@ -36,15 +36,15 @@ void fadeIn() {
 
 void rainbow()
 {
-  // Spatial rainbow: hue follows column position (x), not raw array order.
-  // fill_rainbow() walks leds[] in memory order, which is lane-major + serpentine,
-  // so it produces vertical chevron stripes. Map through XY() instead so the
-  // spectrum sweeps smoothly around the tower and scrolls with gHue.
+  // Diagonal spatial rainbow: hue varies with BOTH column and height so each
+  // strip shows a moving gradient offset from its neighbours (flowing diagonal
+  // bands). Mapped through XY() — never fill leds[] in raw array order, which is
+  // lane-major + serpentine and renders as stripes.
   for (uint8_t x = 0; x < NUM_COLS; x++)
   {
-    uint8_t hue = gHue + (uint8_t)((uint16_t)x * 255 / NUM_COLS);
     for (uint8_t y = 0; y < NUM_ROWS; y++)
     {
+      uint8_t hue = gHue + x * 6 + y * 4; // x,y contributions; uint8_t wraps the wheel
       leds[XY(x, y)] = CHSV(hue, 255, 255);
     }
   }
