@@ -137,13 +137,23 @@ No new enclosure. Everything lives in the **existing model**.
 - **Routing:** add cable channels / grommet through the existing base and VFrame
   for the 4 data lines and the 12 V bus taps.
 
-### PSU mounting — vertical
-The ~1000 W PSU (~218 × 113 × 38 mm) is mounted **vertically** (standing on its
-113 × 38 mm end). That footprint fits the interior cavity (~144 × 144 mm) with
-room to spare, and 218 mm of height is trivial within the 4 ft tower — so it
-fits without enlarging the base. Plan action: confirm 218 mm of unobstructed
-vertical clearance in the lower cavity (clear of the base-top pegs and the first
-LED frame) and add PSU mounting features in the model.
+### PSU mounting — vertical (requires base-top hole enlargement)
+The ~1000 W PSU is mounted **vertically** (standing on its narrow end). The
+interior cavity (~144 × 144 mm) easily accepts the footprint and the 4 ft tower
+easily accepts the height, so no base enlargement is needed for volume.
+
+**However, the PSU will not pass through the base-top opening as-is.** Measured
+base-top through-openings: a main rectangular slot ~43 mm (X) × 100 mm (Z), and a
+secondary rounded opening ~45 × 40.5 mm. A vertical 1000 W 12 V PSU end face is
+~115 × 40 mm — the ~115 mm width exceeds the 100 mm slot by ~15 mm. The slot
+thickness (~40 mm) clears the 43 mm dimension.
+
+**Required CAD change:** widen the main base-top slot to the chosen PSU's end-face
+cross-section + ~3 mm clearance per side. For a ~115 × 40 mm PSU end that is
+≈ **121 × 46 mm**. Finalize the exact dimensions against the datasheet of the
+PSU actually purchased. Also confirm unobstructed vertical clearance for the PSU
+height in the lower cavity (clear of the base-top pegs and the first LED frame)
+and add PSU mounting features.
 
 ## 6. Bill of Materials
 
@@ -180,8 +190,9 @@ Exact quantities and part links finalized in the implementation plan.
 - **Color order** — RGBCalibrate on the first WS2815 strip to confirm GRB.
 
 ## 8. Open Items
-1. **PSU vertical clearance** (§5) — confirm 218 mm unobstructed vertical run in
-   the lower cavity (clear of base-top pegs and the first LED frame); add mounting
-   features. No longer a blocker — orientation decided (vertical).
+1. **Base-top hole enlargement** (§5) — the vertical PSU (~115 × 40 mm end) does
+   not pass the existing ~43 × 100 mm slot; widen to ≈121 × 46 mm (PSU end + 3 mm/
+   side), final size from the purchased PSU's datasheet. Also confirm vertical
+   clearance and add mounting features. Required CAD change, not just a check.
 2. **WS2815 color order** — confirm GRB on first strip.
 3. **Serpentine parity** in `XY()` — confirm against actual wiring direction.
