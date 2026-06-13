@@ -59,17 +59,21 @@ void addGlitter( fract8 chanceOfGlitter)
 }
 
 void fill_grad() {
-  
+
   uint8_t starthue = beatsin8(2, 0, 255);
   uint8_t endhue = beatsin8(15, 0, 255);
-  
-  if (starthue < endhue) {
-    fill_gradient(leds, NUM_LEDS, CHSV(starthue,255,255), CHSV(endhue,255,255), FORWARD_HUES);    // If we don't have this, the colour fill will flip around. 
-  } else {
-    fill_gradient(leds, NUM_LEDS, CHSV(starthue,255,255), CHSV(endhue,255,255), BACKWARD_HUES);
+
+  // Vertical gradient: interpolate start->end hue over the height, same across
+  // all columns. Mapped through XY() — fill_gradient on raw leds[] would stripe.
+  for (uint8_t y = 0; y < NUM_ROWS; y++) {
+    uint8_t hue = starthue + (uint8_t)(((int16_t)endhue - (int16_t)starthue) * y / (NUM_ROWS - 1));
+    for (uint8_t x = 0; x < NUM_COLS; x++) {
+      leds[XY(x, y)] = CHSV(hue, 255, 255);
+    }
   }
-  
-} 
+  FastLED.show();
+
+}
 
 void rainbowWithGlitter()
 {
@@ -107,10 +111,12 @@ void confetti()
 
 void sinelon()
 {
-  // a colored dot sweeping back and forth, with fading trails
+  // a colored vertical bar sweeping back and forth across the columns, trails
   fadeToBlackBy( leds, NUM_LEDS, 20);
-  int pos = beatsin16( 13, 0, NUM_LEDS - 1 );
-  leds[pos] += CHSV( gHue, 255, 192);
+  uint8_t x = beatsin16( 13, 0, NUM_COLS - 1 );
+  for (uint8_t y = 0; y < NUM_ROWS; y++) {
+    leds[XY(x, y)] += CHSV( gHue, 255, 192);
+  }
   FastLED.show();
 }
 
@@ -120,8 +126,12 @@ void bpm()
   uint8_t BeatsPerMinute = 62;
   CRGBPalette16 palette = PartyColors_p;
   uint8_t beat = beatsin8( BeatsPerMinute, 64, 255);
-  for ( int i = 0; i < NUM_LEDS; i++) { //9948
-    leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
+  // Vertical palette gradient pulsing with the beat; identical across columns.
+  for ( uint8_t y = 0; y < NUM_ROWS; y++) {
+    CRGB c = ColorFromPalette(palette, gHue + (y * 2), beat - gHue + (y * 10));
+    for ( uint8_t x = 0; x < NUM_COLS; x++) {
+      leds[XY(x, y)] = c;
+    }
   }
   FastLED.show();
 }
@@ -130,8 +140,12 @@ void juggle() {
   // eight colored dots, weaving in and out of sync with each other
   fadeToBlackBy( leds, NUM_LEDS, 20);
   byte dothue = 0;
-  for ( int i = 0; i < 8; i++) {
-    leds[beatsin16( i + 7, 0, NUM_LEDS - 1 )] |= CHSV(dothue, 200, 255);
+  // eight vertical bars sweeping across the columns at different rates
+  for ( uint8_t i = 0; i < 8; i++) {
+    uint8_t x = beatsin16( i + 7, 0, NUM_COLS - 1 );
+    for (uint8_t y = 0; y < NUM_ROWS; y++) {
+      leds[XY(x, y)] |= CHSV(dothue, 200, 255);
+    }
     dothue += 32;
   }
   FastLED.show();

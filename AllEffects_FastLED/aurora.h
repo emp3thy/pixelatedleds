@@ -3,27 +3,32 @@
 #include "configuration.h"
 #include "XYMatrix.h"
 
+// Aurora borealis: drifting vertical curtains of light on a dark sky, colour
+// shifting with height — green up high fading to violet/magenta lower down —
+// like real northern-lights photos. Sine-based so the curtains are smooth and
+// reliably structured (each column has a coherent vertical ray).
 void aurora() {
-  uint16_t t = millis() / 12;
-  for (uint8_t y = 0; y < NUM_ROWS; y++) {
-    // row 0 brightest, falls off toward bottom row
-    uint8_t rowBri = 255 - ((uint16_t)y * 220 / (NUM_ROWS - 1));
-    for (uint8_t x = 0; x < NUM_COLS; x++) {
-      // horizontal shimmer band — two sines summed and scaled
-      uint16_t bandSum = (uint16_t)sin8(x * 5 + t) + (uint16_t)sin8(x * 3 - t / 2);
-      uint8_t band = bandSum / 2;
-      // hue: saturating add keeps aurora in green→violet range, no red wrap
-      uint8_t hue = qadd8(96, (band >> 1) + (y * 8));
-      // brightness: combine row falloff with shimmer
-      uint8_t bri = scale8(rowBri, qadd8(band, 40));
-      leds[XY(x, y)] = CHSV(hue, 220, bri);
+  uint16_t t = millis();
+  for (uint8_t x = 0; x < NUM_COLS; x++) {
+    // Ray strength for this column: two slow sine waves drifting sideways at
+    // different rates → smooth vertical bands that wander over time.
+    uint8_t rayv = (uint8_t)(((uint16_t)sin8(x * 14 + t / 15) +
+                              (uint16_t)sin8(x * 8  - t / 22)) / 2);
+    for (uint8_t y = 0; y < NUM_ROWS; y++) {
+      // Shimmer travelling up the curtain (slowed).
+      uint8_t shimmer = sin8(y * 5 + x * 3 + t / 8);
+      uint8_t factor  = qadd8(120, shimmer >> 1);   // 120..183
+      uint8_t b       = scale8(rayv, factor);       // ray dimmed by shimmer
+      b               = qadd8(b, b >> 2);           // +25% light
+      uint8_t bri     = (b < 45) ? 0 : b;           // dark sky between curtains
+      // Hue: green (96) at top → violet/magenta (200) toward the bottom.
+      uint8_t hue = 96 + (uint16_t)y * (200 - 96) / (NUM_ROWS - 1);
+      leds[XY(x, y)] = CHSV(hue, 235, bri);
     }
   }
-  // sparse violet shimmer on top two rows
-  if (random8() < 18) {
-    uint8_t sx = random8(NUM_COLS);
-    uint8_t sy = random8(2);
-    leds[XY(sx, sy)] = CRGB(220, 100, 255);
+  // Sparse faint stars on the dark sky.
+  if (random8() < 30) {
+    leds[XY(random8(NUM_COLS), random8(NUM_ROWS))] += CRGB(30, 30, 45);
   }
   FastLED.show();
 }

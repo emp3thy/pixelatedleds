@@ -7,24 +7,14 @@
 #undef MAT_TOP        /* define if matrix 0,0 is in top row of display; undef if bottom */
 #define MAT_LEFT       /* define if matrix 0,0 is on left edge of display; undef if right */
 #define MAT_ZIGZAG    /* define if matrix zig-zags ---> <--- ---> <---; undef if scanning ---> ---> ---> */
-#define FPS 15        /* Refresh rate */
+#define FPS 60        /* Refresh rate (raised so flames climb faster) */
 
-/* --- DO NOT CHANGE THESE LINES --- */
-/* Display size; can be smaller than matrix size, and if so, you can move the origin.
- * This allows you to have a small fire display on a large matrix sharing the display
- * with other stuff. See README at Github. */
 const uint16_t fireRows = NUM_ROWS;
 const uint16_t fireCols = NUM_COLS;
 const uint16_t xorg = 0;
 const uint16_t yorg = 0;
 
-/* Flare constants */
-const uint8_t flarerows = 3;    /* number of rows (from bottom) allowed to flare */
-const uint8_t maxflare = 8;     /* max number of simultaneous flares */
-const uint8_t flarechance = 10; /* chance (%) of a new flare (if there's room) */
-const uint8_t flaredecay = 14;  /* decay rate of flare radiation; 14 is good */
-
-/* This is the map of colors from coolest (black) to hottest. Want blue flames? Go for it! */
+/* Heat palette: coolest (black) to hottest (near-white). */
 const uint32_t colors[] = {
     0x000000,
     0x100000,
@@ -39,16 +29,20 @@ const uint32_t colors[] = {
     0x807080};
 const uint8_t NCOLORS = (sizeof(colors) / sizeof(colors[0]));
 
-uint8_t pix[fireRows][fireCols];
+// Fire2012-style cooling/sparking model. Unlike the old fixed-decrement model
+// (which died after ~8 rows because the palette only had 11 levels), heat is
+// tracked at full 0..255 resolution and COOLING is scaled by the matrix height,
+// so flames climb the entire 73-row tower with a natural falloff toward the top.
+//   FIRE_COOLING  : higher = shorter flames. Tuned for the tall vertical frame.
+//   FIRE_SPARKING : chance (0-255) of a new spark at the base each frame.
+#define FIRE_COOLING  70
+#define FIRE_SPARKING 120
 
-uint8_t nflare = 0;
-uint32_t flare[maxflare];
+// heat[row][col], row 0 = bottom (hottest). Static → lives in .bss, not on stack.
+static uint8_t heat[fireRows][fireCols];
 
-/** pos - convert col/row to pixel position index. This takes into account
- *  the serpentine display, and mirroring the display so that 0,0 is the
- *  bottom left corner and (MAT_W-1,MAT_H-1) is upper right. You may need
- *  to jockey this around if your display is different.
- */
+/** pos - convert col/row to pixel index, honouring the serpentine/orientation
+ *  config above so row 0 is the bottom row. */
 #ifndef MAT_LEFT
 #define __MAT_RIGHT
 #endif
@@ -92,112 +86,52 @@ uint16_t pos(uint16_t col, uint16_t row)
   return phy_x + phy_y * phy_w;
 }
 
-uint32_t isqrt(uint32_t n)
+// Map a 0..255 heat value onto the colors[] palette with linear interpolation.
+CRGB heatToColor(uint8_t h)
 {
-  if (n < 2)
-    return n;
-  uint32_t smallCandidate = isqrt(n >> 2) << 1;
-  uint32_t largeCandidate = smallCandidate + 1;
-  return (largeCandidate * largeCandidate > n) ? smallCandidate : largeCandidate;
+  uint16_t scaled = (uint16_t)h * (NCOLORS - 1); // 0 .. (NCOLORS-1)*255
+  uint8_t idx = scaled / 255;                    // palette slot
+  if (idx >= NCOLORS - 1)
+    return CRGB(colors[NCOLORS - 1]);
+  uint8_t frac = scaled % 255;                   // blend toward next slot
+  return blend(CRGB(colors[idx]), CRGB(colors[idx + 1]), frac);
 }
 
-// Set pixels to intensity around flare
-void glow(int x, int y, int z)
-{
-  int b = z * 10 / flaredecay + 1;
-  for (int i = (y - b); i < (y + b); ++i)
-  {
-    for (int j = (x - b); j < (x + b); ++j)
-    {
-      if (i >= 0 && j >= 0 && i < fireRows && j < fireCols)
-      {
-        int d = (flaredecay * isqrt((x - j) * (x - j) + (y - i) * (y - i)) + 5) / 10;
-        uint8_t n = 0;
-        if (z > d)
-          n = z - d;
-        if (n > pix[i][j])
-        { // can only get brighter
-          pix[i][j] = n;
-        }
-      }
-    }
-  }
-}
-
-void newflare()
-{
-  if (nflare < maxflare && random(1, 101) <= flarechance)
-  {
-    int x = random(0, fireCols);
-    int y = random(0, flarerows);
-    int z = NCOLORS - 1;
-    flare[nflare++] = (z << 16) | (y << 8) | (x & 0xff);
-    glow(x, y, z);
-  }
-}
-
-/** make_fire() animates the fire display. It should be called from the
- *  loop periodically (at least as often as is required to maintain the
- *  configured refresh rate). Better to call it too often than not enough.
- *  It will not refresh faster than the configured rate. But if you don't
- *  call it frequently enough, the refresh rate may be lower than
- *  configured.
- */
-unsigned long fireNextMs = 0; /* keep time */
+unsigned long fireNextMs = 0;
 void make_fire()
 {
-  uint16_t i, j;
   if (fireNextMs > millis())
     return;
   fireNextMs = millis() + (1000 / FPS);
 
-  // First, move all existing heat points up the display and fade
-  for (i = fireRows - 1; i > 0; --i)
+  for (uint16_t j = 0; j < fireCols; j++)
   {
-    for (j = 0; j < fireCols; ++j)
+    // 1) Cool every cell a little. Cooling is scaled by height so the flame
+    //    front reaches the top of a tall display instead of dying low.
+    for (uint16_t i = 0; i < fireRows; i++)
     {
-      uint8_t n = 0;
-      if (pix[i - 1][j] > 0)
-        n = pix[i - 1][j] - 1;
-      pix[i][j] = n;
+      uint8_t cooldown = random8(0, ((FIRE_COOLING * 10) / fireRows) + 2);
+      heat[i][j] = (cooldown >= heat[i][j]) ? 0 : (heat[i][j] - cooldown);
     }
-  }
 
-  // Heat the bottom row — always reseed so cold cells reignite
-  for (j = 0; j < fireCols; ++j)
-  {
-    pix[0][j] = random(NCOLORS - 6, NCOLORS - 2);
-  }
-
-  // flare
-  for (i = 0; i < nflare; ++i)
-  {
-    int x = flare[i] & 0xff;
-    int y = (flare[i] >> 8) & 0xff;
-    int z = (flare[i] >> 16) & 0xff;
-    glow(x, y, z);
-    if (z > 1)
+    // 2) Heat drifts upward and diffuses (average of the two cells below).
+    for (uint16_t i = fireRows - 1; i >= 2; i--)
     {
-      flare[i] = (flare[i] & 0xffff) | ((z - 1) << 16);
+      heat[i][j] = (heat[i - 1][j] + heat[i - 2][j] + heat[i - 2][j]) / 3;
     }
-    else
-    {
-      // This flare is out
-      for (int j = i + 1; j < nflare; ++j)
-      {
-        flare[j - 1] = flare[j];
-      }
-      --nflare;
-    }
-  }
-  newflare();
 
-  // Set and draw
-  for (i = 0; i < fireRows; ++i)
-  {
-    for (j = 0; j < fireCols; ++j)
+    // 3) Randomly ignite new sparks near the base.
+    if (random8() < FIRE_SPARKING)
     {
-      leds[pos(j, i)] = colors[pix[i][j]];
+      uint8_t y = random8(fireRows < 3 ? fireRows : 3);
+      heat[y][j] = qadd8(heat[y][j], random8(160, 255));
+    }
+
+    // 4) Render this column. heat row 0 is the base (hottest); map it to the
+    //    bottom of the display so flames rise upward (not inverted).
+    for (uint16_t i = 0; i < fireRows; i++)
+    {
+      leds[pos(j, fireRows - 1 - i)] = heatToColor(heat[i][j]);
     }
   }
   FastLED.show();
