@@ -6,6 +6,9 @@ byte rain[NUM_LEDS];
 byte speed = 2;
 int rainTick=0;
 
+// Adapter so blurRows knows our (lane-major) array layout: forward to XY().
+static uint16_t rainXYFunc(uint16_t x, uint16_t y, uint16_t, uint16_t) { return XY((uint8_t)x, (uint8_t)y); }
+
 void updaterain() {
   for (byte i = 0; i < NUM_COLS; i++) {
     for (byte j = 0; j < NUM_ROWS; j++) {
@@ -19,8 +22,8 @@ void updaterain() {
 
   speed = (speed + 1) % NUM_ROWS;
   fadeToBlackBy(leds, NUM_LEDS, 40);
-  // blurRows(leds, NUM_COLS, NUM_ROWS, 16);  // optional; disabled: newer FastLED
-  // (sim build) changed blurRows to a 5-arg XYMap signature, breaks the WASM build.
+  static XYMap rainMap = XYMap::constructWithUserFunction(NUM_COLS, NUM_ROWS, rainXYFunc);
+  blurRows(leds, NUM_COLS, NUM_ROWS, 16, rainMap);   // 3.10.3 needs the XYMap arg
   FastLED.show();
 } //updaterain
 
