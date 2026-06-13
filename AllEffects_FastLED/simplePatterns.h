@@ -87,7 +87,7 @@ void rainbowWithGlitter()
 void justWhite()
 {
   for (int i = 0; i < NUM_LEDS; i++ ) {
-    leds[i] = CHSV(0, 0, BRIGHTNESS);
+    leds[i] = CHSV(0, 0, 255);   // full-white pixel; global setBrightness() dims it
   }
   FastLED.show();
 }

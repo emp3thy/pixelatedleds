@@ -6,7 +6,10 @@ byte dist (uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)  {
   int b = x2 - x1;
   a *= a;
   b *= b;
-  byte dist = 220 / sqrt16(a + b);
+  uint8_t r = sqrt16(a + b);
+  // r==0 when the pixel sits exactly on the ball centre. 220/0 is undefined on
+  // AVR and traps ("divide by zero") under WASM/emscripten — clamp to max here.
+  byte dist = r ? (220 / r) : 220;
   return dist;
 }
 void metaBalls()
@@ -31,10 +34,13 @@ void metaBalls()
       sum = qadd8(sum, dist(i, j, bx4, by4));
       sum = qadd8(sum, dist(i, j, bx5, by5));
 
-      leds[XY (i, j)] =  ColorFromPalette(HeatColors_p, sum + 165, BRIGHTNESS);
+      // Use the field value directly (small lift) as the heat index. The old
+      // "+165" bias shoved everything into the pale white top of HeatColors,
+      // which read as washed-out; this keeps saturated reds/oranges with bright cores.
+      leds[XY (i, j)] =  ColorFromPalette(HeatColors_p, qadd8(sum, 40), BRIGHTNESS);
     }
   }
 
-  blur2d(leds, NUM_COLS, NUM_ROWS, 32 );
+  blur2d(leds, NUM_COLS, NUM_ROWS, 20 );
   FastLED.show();
 }
