@@ -19,7 +19,8 @@ void updaterain() {
 
   speed = (speed + 1) % NUM_ROWS;
   fadeToBlackBy(leds, NUM_LEDS, 40);
-  blurRows(leds, NUM_COLS, NUM_ROWS, 16);      //if you want
+  // blurRows(leds, NUM_COLS, NUM_ROWS, 16);  // optional; disabled: newer FastLED
+  // (sim build) changed blurRows to a 5-arg XYMap signature, breaks the WASM build.
   FastLED.show();
 } //updaterain
 
