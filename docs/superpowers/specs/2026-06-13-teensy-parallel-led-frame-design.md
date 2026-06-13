@@ -137,23 +137,25 @@ No new enclosure. Everything lives in the **existing model**.
 - **Routing:** add cable channels / grommet through the existing base and VFrame
   for the 4 data lines and the 12 V bus taps.
 
-### PSU mounting — vertical (requires base-top hole enlargement)
+### PSU mounting — vertical (base-top slot already enlarged)
 The ~1000 W PSU is mounted **vertically** (standing on its narrow end). The
 interior cavity (~144 × 144 mm) easily accepts the footprint and the 4 ft tower
-easily accepts the height, so no base enlargement is needed for volume.
+easily accepts the height.
 
-**However, the PSU will not pass through the base-top opening as-is.** Measured
-base-top through-openings: a main rectangular slot ~43 mm (X) × 100 mm (Z), and a
-secondary rounded opening ~45 × 40.5 mm. A vertical 1000 W 12 V PSU end face is
-~115 × 40 mm — the ~115 mm width exceeds the 100 mm slot by ~15 mm. The slot
-thickness (~40 mm) clears the 43 mm dimension.
+The base-top main slot has been **enlarged to ~75 × 140 mm** (was ~43 × 100 mm).
+A vertical PSU passes through long-edge along the 140 mm axis. This clears all
+three candidate supplies:
 
-**Required CAD change:** widen the main base-top slot to the chosen PSU's end-face
-cross-section + ~3 mm clearance per side. For a ~115 × 40 mm PSU end that is
-≈ **121 × 46 mm**. Finalize the exact dimensions against the datasheet of the
-PSU actually purchased. Also confirm unobstructed vertical clearance for the PSU
-height in the lower cavity (clear of the base-top pegs and the first LED frame)
-and add PSU mounting features.
+| PSU | 12V | End face | Fits 75×140 | Clearance/side |
+|-----|-----|----------|-------------|----------------|
+| MSP-1000-12 | 80A | 98 × 50 | yes | ~12.5 / ~21 mm |
+| S-1000-12 (generic) | 80A | 115 × 50 | yes | ~12.5 / ~12.5 mm |
+| SE-1000-12 (Mean Well) | 83.3A | 127 × 63.5 | yes | ~5.7 / ~6.5 mm |
+
+The slot is no longer the limiting constraint. Remaining plan actions: confirm
+unobstructed vertical clearance for the PSU height in the lower cavity (clear of
+the base-top pegs and the first LED frame), and add PSU mounting features.
+Re-verify against the final purchased PSU's datasheet before build.
 
 ## 6. Bill of Materials
 
@@ -190,9 +192,9 @@ Exact quantities and part links finalized in the implementation plan.
 - **Color order** — RGBCalibrate on the first WS2815 strip to confirm GRB.
 
 ## 8. Open Items
-1. **Base-top hole enlargement** (§5) — the vertical PSU (~115 × 40 mm end) does
-   not pass the existing ~43 × 100 mm slot; widen to ≈121 × 46 mm (PSU end + 3 mm/
-   side), final size from the purchased PSU's datasheet. Also confirm vertical
-   clearance and add mounting features. Required CAD change, not just a check.
+1. **PSU final selection + clearance** (§5) — base-top slot already enlarged to
+   ~75 × 140 mm and clears all three candidates (MSP/S-1000/SE-1000-12). Pick the
+   purchased model for the BOM, confirm vertical clearance, add mounting features,
+   re-verify slot vs datasheet. (Hole no longer a blocker.)
 2. **WS2815 color order** — confirm GRB on first strip.
 3. **Serpentine parity** in `XY()` — confirm against actual wiring direction.
