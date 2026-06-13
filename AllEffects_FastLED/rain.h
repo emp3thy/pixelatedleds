@@ -12,7 +12,7 @@ void updaterain() {
       byte layer = rain[XY(i, ((j + speed + random8(2) + NUM_ROWS) % NUM_ROWS))];   //fake scroll based on shift coordinate
       // random8(2) add glitchy look
       if (layer) {
-        leds[XY(i,j)] = CHSV(141, 255, BRIGHTNESS);
+        leds[XY(i,j)] = CHSV(141, 255, 255);   // full value; global setBrightness dims
       }
     }
   }

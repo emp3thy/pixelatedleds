@@ -37,7 +37,7 @@ void metaBalls()
       // Use the field value directly (small lift) as the heat index. The old
       // "+165" bias shoved everything into the pale white top of HeatColors,
       // which read as washed-out; this keeps saturated reds/oranges with bright cores.
-      leds[XY (i, j)] =  ColorFromPalette(HeatColors_p, qadd8(sum, 40), BRIGHTNESS);
+      leds[XY (i, j)] =  ColorFromPalette(HeatColors_p, qadd8(sum, 40), 255);
     }
   }
 
