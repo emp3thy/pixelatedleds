@@ -17,9 +17,9 @@ concurrency:
 
 jobs:
   compile:
-    name: arduino-cli compile (uno)
+    name: arduino-cli compile (teensy40)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -27,15 +27,17 @@ jobs:
       - name: Install arduino-cli
         uses: arduino/setup-arduino-cli@v2
 
-      - name: Install AVR core
+      - name: Install Teensy core
         run: |
-          arduino-cli core update-index
-          arduino-cli core install arduino:avr
+          arduino-cli core update-index \
+            --additional-urls https://www.pjrc.com/teensy/package_teensy_index.json
+          arduino-cli core install teensy:avr \
+            --additional-urls https://www.pjrc.com/teensy/package_teensy_index.json
 
       - name: Compile sketch
         run: |
           arduino-cli compile \
-            --fqbn arduino:avr:uno \
+            --fqbn teensy:avr:teensy40 \
             --warnings all \
             --libraries AllEffects_FastLED/libraries \
             AllEffects_FastLED
