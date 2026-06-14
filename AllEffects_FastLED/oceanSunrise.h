@@ -108,8 +108,32 @@ static void oceanUpdateStageState(float p){
 
 // ---- layer stubs (filled in later tasks) ----
 static void oceanDrawClouds()      {}
-static void oceanDrawStars()       {}
 static void oceanDrawMoon()        {}
+
+#define OCEAN_NUM_STARS 30
+struct OceanStar { uint8_t x, y, ph; };
+static OceanStar oceanStars[OCEAN_NUM_STARS];
+static bool oceanStarsInit = false;
+static void oceanInitStars(){
+  for(uint8_t i=0;i<OCEAN_NUM_STARS;i++){
+    oceanStars[i].x = random8(NUM_COLS);
+    oceanStars[i].y = random8(OCEAN_HORIZON-6);   // upper sky only
+    oceanStars[i].ph = random8();
+  }
+  oceanStarsInit = true;
+}
+static void oceanDrawStars(){
+  if(ocean.nf <= 0.01f) return;                   // day: no stars
+  if(!oceanStarsInit) oceanInitStars();
+  uint16_t t = millis();
+  for(uint8_t i=0;i<OCEAN_NUM_STARS;i++){
+    OceanStar &s = oceanStars[i];
+    uint8_t tw = sin8(s.ph + t/6);                // twinkle 0..255
+    float a = ocean.nf * (0.35f + tw/400.0f);     // opacity follows night factor
+    if(a>1) a=1;
+    leds[XY(s.x,s.y)] += CRGB((uint8_t)(200*a),(uint8_t)(210*a),(uint8_t)(235*a));
+  }
+}
 
 static CRGB oceanSunColor();   // defined with the sun layer below
 
