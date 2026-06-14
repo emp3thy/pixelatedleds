@@ -185,6 +185,9 @@ static void oceanInitStars(){
   while(oceanStarCount < OCEAN_NUM_STARS && guard++ < 3000){
     uint8_t sx = random8(NUM_COLS);
     uint8_t sy = random8(OCEAN_HORIZON-6);        // upper sky only
+    // keep clear of the moon + its halo
+    int16_t mdx = (int16_t)sx - OCEAN_MOON_X, mdy = (int16_t)sy - OCEAN_MOON_Y;
+    if(mdx*mdx + mdy*mdy < (OCEAN_MOON_R+7)*(OCEAN_MOON_R+7)) continue;
     bool ok = true;                                // reject if touching another star (8-neighbour)
     for(uint8_t i=0;i<oceanStarCount;i++){
       int16_t ddx = (int16_t)sx - oceanStars[i].x;
