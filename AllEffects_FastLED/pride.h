@@ -11,7 +11,7 @@ void pride()
   static uint16_t sHue16 = 0;
 
   uint8_t sat8 = beatsin88( 87, 220, 250);
-  uint8_t brightdepth = beatsin88( 341, 96, 224);
+  uint8_t brightdepth = beatsin88( 341, 72, 168);   // lower depth -> higher floor -> brighter
   uint16_t brightnessthetainc16 = beatsin88( 203, (25 * 256), (40 * 256));
   uint8_t msmultiplier = beatsin88(147, 23, 60);
 
@@ -42,8 +42,9 @@ void pride()
 
       CRGB newcolor = CHSV( hue8, sat8, bri8);
 
-      nblend( leds[XY(x, y)], newcolor, 64);
+      nblend( leds[XY(x, y)], newcolor, 96);
     }
   }
+  blur2d(leds, NUM_COLS, NUM_ROWS, 32);   // soften the rainbow bands
   FastLED.show();
 }

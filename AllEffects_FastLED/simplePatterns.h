@@ -102,10 +102,12 @@ void jusBlack()
 
 void confetti()
 {
-  // random colored speckles that blink in and fade smoothly
+  // random colored speckles that blink in and fade smoothly (2 per frame)
   fadeToBlackBy( leds, NUM_LEDS, 10);
-  int pos = random16(NUM_LEDS);
-  leds[pos] += CHSV( gHue + random8(64), 200, 255);
+  for (uint8_t k = 0; k < 2; k++) {
+    int pos = random16(NUM_LEDS);
+    leds[pos] += CHSV( gHue + random8(64), 200, 255);
+  }
   FastLED.show();
 }
 

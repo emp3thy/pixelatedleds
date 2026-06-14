@@ -63,9 +63,9 @@ void pacifica_add_whitecaps()
 void pacifica_deepen_colors()
 {
   for ( uint16_t i = 0; i < NUM_LEDS; i++) {
-    leds[i].blue = scale8( leds[i].blue,  200);   // less darkening -> clearer water
-    leds[i].green = scale8( leds[i].green, 235);
-    leds[i] |= CRGB( 2, 5, 7);
+    leds[i].blue = scale8( leds[i].blue,  235);   // less darkening -> brighter, clearer water
+    leds[i].green = scale8( leds[i].green, 248);
+    leds[i] |= CRGB( 3, 8, 12);
   }
 }
 
@@ -92,10 +92,10 @@ void pacifica_loop()
   fill_solid( leds, NUM_LEDS, CRGB( 2, 6, 10));
 
   // Render each of four layers, with different scales and speeds, that vary over time
-  pacifica_one_layer( pacifica_palette_1, sCIStart1, beatsin16( 3, 11 * 256, 14 * 256), beatsin8( 10, 100, 170), 0 - beat16( 301) );
-  pacifica_one_layer( pacifica_palette_2, sCIStart2, beatsin16( 4,  6 * 256,  9 * 256), beatsin8( 17, 60,  110), beat16( 401) );
-  pacifica_one_layer( pacifica_palette_3, sCIStart3, 6 * 256, beatsin8( 9, 20, 55), 0 - beat16(503));
-  pacifica_one_layer( pacifica_palette_3, sCIStart4, 5 * 256, beatsin8( 8, 20, 45), beat16(601));
+  pacifica_one_layer( pacifica_palette_1, sCIStart1, beatsin16( 3, 11 * 256, 14 * 256), beatsin8( 10, 132, 205), 0 - beat16( 301) );
+  pacifica_one_layer( pacifica_palette_2, sCIStart2, beatsin16( 4,  6 * 256,  9 * 256), beatsin8( 17, 88, 160), beat16( 401) );
+  pacifica_one_layer( pacifica_palette_3, sCIStart3, 6 * 256, beatsin8( 9, 34, 78), 0 - beat16(503));
+  pacifica_one_layer( pacifica_palette_3, sCIStart4, 5 * 256, beatsin8( 8, 34, 70), beat16(601));
 
   // Add brighter 'whitecaps' where the waves lines up more
   pacifica_add_whitecaps();

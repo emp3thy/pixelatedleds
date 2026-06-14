@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LED Flat Viewer</title>
+<style>
+  body { background:#101012; color:#ddd; font-family:system-ui,sans-serif; margin:0; padding:16px;
+         display:flex; flex-direction:column; align-items:center; gap:14px; }
+  h1 { font-size:16px; font-weight:600; margin:0; color:#9ad; }
+  #stage { display:flex; gap:24px; align-items:flex-start; }
+  canvas { background:#000; image-rendering:pixelated; border:1px solid #333; }
+  .panel { display:flex; flex-direction:column; gap:14px; min-width:260px; }
+  .ctl { display:flex; flex-direction:column; gap:4px; }
+  .ctl label { font-size:13px; color:#bbb; }
+  .row { display:flex; justify-content:space-between; font-size:12px; color:#888; }
+  input[type=range] { width:100%; }
+  .name { font-weight:600; color:#eee; }
+  #log { font-family:ui-monospace,monospace; font-size:11px; color:#777; white-space:pre-wrap;
+         max-width:260px; max-height:140px; overflow:auto; border-top:1px solid #2a2a2a; padding-top:6px; }
+  .pill { font-size:11px; color:#9ad; }
+</style>
+</head>
+<body>
+  <h1>LED Flat Viewer — no bloom, true colour</h1>
+  <div id="stage">
+    <canvas id="screen" width="440" height="730"></canvas>
+    <div class="panel">
+      <div class="ctl">
+        <label>Pattern <span class="name" id="patName">0</span></label>
+        <input type="range" id="pattern" min="0" max="1083" step="57" value="0">
+        <div class="row"><span>0</span><span id="patVal">0</span><span>19</span></div>
+      </div>
+      <div class="ctl">
+        <label>Brightness gain <span id="gainVal">3.0×</span></label>
+        <input type="range" id="gain" min="1" max="6" step="0.5" value="3">
+      </div>
+      <div class="ctl">
+        <label>Pixel size <span id="cellVal">10px</span></label>
+        <input type="range" id="cell" min="4" max="18" step="1" value="10">
+      </div>
+      <div class="pill" id="fps">fps —</div>
+      <div id="log"></div>
+    </div>
+  </div>
+
+<script>
+(async () => {
+  const logEl = document.getElementById('log');
+  const log = (...a) => { console.log(...a); logEl.textContent = a.join(' ') + '\n' + logEl.textContent; };
+
+  // --- Patterns names in slider order (index = sliderVal/57) ---
+  const NAMES = ['pride','pacifica','metaBalls','fire','juggle','sinelon','rainbow','justWhite',
+                 'palette fade','rain','confetti','bpm','rainbow+glitter',
+                 'mondrian','plasma','aurora','voronoi',
+                 'water lilies','kusama dots','jusBlack (off)'];
+
+  // --- UI manifest capture (C++ pushes component list here) ---
+  let sliderId = null;
+  function captureUi(jsonStr) {
+    try {
+      const data = JSON.parse(jsonStr);
+      const arr = Array.isArray(data) ? data : (data.components || Object.values(data));
+      for (const c of arr) {
+        const type = (c.type || '').toLowerCase();
+        if (type.includes('slider') || (c.min !== undefined && c.max !== undefined && c.step !== undefined)) {
+          if (sliderId === null) { sliderId = c.id; log('slider id =', c.id, 'name=', c.name); }
+        }
+      }
+    } catch (e) { /* manifest may arrive in pieces */ }
+  }
+
+  log('loading wasm…');
+  // Auto cache-bust EVERY load so a plain refresh always runs the latest build
+  // (no more ?b=N juggling / stale tabs showing old code).
+  const BUST = Date.now();
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'fastled_js/fastled.js?t=' + BUST;
+    s.onload = res; s.onerror = () => rej(new Error('failed to load fastled.js'));
+    document.head.appendChild(s);
+  });
+  const Module = await fastled({
+    locateFile: (p) => p.endsWith('.wasm') ? 'fastled_js/fastled.wasm?t=' + BUST : p,
+    print:    (t) => console.log('[wasm]', t),
+    printErr: (t) => console.warn('[wasm]', t),
+    _jsUiManager_updateUiComponents: captureUi,
+  });
+  window.__M = Module;
+  log('wasm ready');
+
+  const externSetup      = Module.cwrap('extern_setup', 'number', []);
+  const externLoop       = Module.cwrap('extern_loop', 'number', []);  // synchronous (no PROXY_TO_PTHREAD)
+  const getFrameData     = Module.cwrap('getFrameData', 'number', ['number']);
+  const getStripPixelData= Module.cwrap('getStripPixelData', 'number', ['number','number']);
+  const getScreenMapData = Module.cwrap('getScreenMapData', 'number', ['number']);
+  const processUiInput   = Module.cwrap('processUiInput', null, ['string']);
+  const SLIDER_NAME      = 'Pattern (0-19)';   // UISlider name; UI manager matches by name
+
+  const readJson = (getter) => {
+    const sizePtr = Module._malloc(4);
+    const ptr = getter(sizePtr);
+    if (ptr === 0) { Module._free(sizePtr); return null; }
+    const size = Module.getValue(sizePtr, 'i32');
+    const str = Module.UTF8ToString(ptr, size);
+    Module._free(sizePtr);
+    try { return JSON.parse(str); } catch { return null; }
+  };
+
+  externSetup();
+  log('setup done');
+
+  // --- Parse screenmap → positions per LED (strip 0) ---
+  let xs = null, ys = null, W = 44, H = 73;
+  function loadScreenMap() {
+    const sm = readJson(getScreenMapData);
+    if (!sm) return false;
+    // shape: { "0": { strips: { "0": { map:{x:[],y:[]} } } } }  (also tolerate flatter shapes)
+    let strip = null;
+    for (const outer of Object.values(sm)) {
+      if (outer && outer.strips) { strip = Object.values(outer.strips)[0]; break; }
+    }
+    if (!strip && sm.strips) strip = Object.values(sm.strips)[0];
+    if (!strip || !strip.map) return false;
+    xs = strip.map.x; ys = strip.map.y;
+    W = Math.round(Math.max(...xs)) + 1;
+    H = Math.round(Math.max(...ys)) + 1;
+    log('screenmap', W + '×' + H, xs.length + ' leds');
+    return true;
+  }
+
+  // --- Controls ---
+  const patEl = document.getElementById('pattern');
+  const gainEl = document.getElementById('gain');
+  const cellEl = document.getElementById('cell');
+  const patVal = document.getElementById('patVal'), patName = document.getElementById('patName');
+  const gainValEl = document.getElementById('gainVal'), cellValEl = document.getElementById('cellVal');
+  const fpsEl = document.getElementById('fps');
+  let pendingUi = null, gain = 3, cell = 10;
+  const idx = v => Math.min(19, Math.round(v / 57));
+  function onPattern() {
+    const v = +patEl.value;
+    patVal.textContent = v; patName.textContent = idx(v) + ' · ' + NAMES[idx(v)];
+    pendingUi = v;
+  }
+  patEl.addEventListener('input', onPattern);
+  gainEl.addEventListener('input', () => { gain = +gainEl.value; gainValEl.textContent = gain.toFixed(1)+'×'; });
+  cellEl.addEventListener('input', () => { cell = +cellEl.value; cellValEl.textContent = cell+'px'; resize(); });
+  onPattern();
+
+  const cv = document.getElementById('screen'), ctx = cv.getContext('2d');
+  function resize() { cv.width = W * cell; cv.height = H * cell; }
+
+  function applyPendingUi() {
+    if (pendingUi === null) return;
+    const changes = {}; changes[SLIDER_NAME] = pendingUi;
+    try { processUiInput(JSON.stringify(changes)); } catch (e) { log('ui err', e.message); }
+    pendingUi = null;
+  }
+
+  // Read strip 0 pixel data; returns Uint8Array or null (null when no show() yet).
+  function readStripPixels() {
+    const sizePtr = Module._malloc(4);
+    const dataPtr = getStripPixelData(0, sizePtr);
+    const size = Module.getValue(sizePtr, 'i32');
+    Module._free(sizePtr);
+    if (dataPtr === 0 || size === 0) return null;
+    return new Uint8Array(Module.HEAPU8.buffer, dataPtr, size);
+  }
+
+  function draw(pix) {
+    if (!xs && !loadScreenMap()) return false;
+    if (cv.width !== W * cell) resize();
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
+    const n = Math.min(xs.length, pix.length / 3);
+    for (let i = 0; i < n; i++) {
+      let r = Math.min(255, pix[i*3]   * gain);
+      let g = Math.min(255, pix[i*3+1] * gain);
+      let b = Math.min(255, pix[i*3+2] * gain);
+      ctx.fillStyle = 'rgb(' + (r|0) + ',' + (g|0) + ',' + (b|0) + ')';
+      ctx.fillRect(xs[i]*cell, ys[i]*cell, cell, cell);
+    }
+    return true;
+  }
+
+  // Pump extern_loop until a show()-produced frame is available (bounded), then draw it.
+  let frames = 0, t0 = performance.now();
+  async function loop() {
+    try {
+      window.__n = (window.__n||0) + 1;
+      applyPendingUi();
+      externLoop();                // synchronous (no PROXY_TO_PTHREAD)
+      const strips = readJson(getFrameData);   // commits the frame; non-empty only on show() frames
+      if (Array.isArray(strips) && strips.length > 0) {
+        const pix = readStripPixels();
+        if (pix) draw(pix);        // otherwise keep the last drawn frame
+      }
+      frames++;
+      const now = performance.now();
+      if (now - t0 > 500) { fpsEl.textContent = 'fps ' + (frames*1000/(now-t0)).toFixed(0); frames = 0; t0 = now; }
+    } catch (e) { log('loop err:', e.message); console.error(e); }
+    setTimeout(loop, 0);   // setTimeout (not rAF) so it keeps running in background tabs too
+  }
+  resize();
+  log('starting loop');
+  setTimeout(loop, 0);   // initial kick via setTimeout (rAF is paused in background tabs)
+})().catch(e => { document.getElementById('log').textContent = 'FATAL: ' + (e && e.message); console.error(e); });
+</script>
+</body>
+</html>
