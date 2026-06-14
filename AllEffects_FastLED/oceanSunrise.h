@@ -149,37 +149,53 @@ static void oceanDrawMoon(){
   bool  waxing = ph > 0.5f;                                   // 0.5..1 grows back toward full
   CRGB col = oceanMoonColor();
   float R = OCEAN_MOON_R;
-  for(int16_t y=OCEAN_MOON_Y-OCEAN_MOON_R-3; y<=OCEAN_MOON_Y+OCEAN_MOON_R+3; y++){
+  float haloR = OCEAN_MOON_R + 6.0f;                          // wide soft glow (like the sun)
+  int16_t rad = (int16_t)haloR + 1;
+  for(int16_t y=OCEAN_MOON_Y-rad; y<=OCEAN_MOON_Y+rad; y++){
     if(y<0||y>=OCEAN_HORIZON) continue;
-    for(int16_t x=OCEAN_MOON_X-OCEAN_MOON_R-3; x<=OCEAN_MOON_X+OCEAN_MOON_R+3; x++){
+    for(int16_t x=OCEAN_MOON_X-rad; x<=OCEAN_MOON_X+rad; x++){
       if(x<0||x>=NUM_COLS) continue;
       float dx=x-OCEAN_MOON_X, dy=y-OCEAN_MOON_Y, d=sqrtf(dx*dx+dy*dy);
+      if(d > haloR) continue;
+      // Halo FIRST (additive, also under the rim) so the AA disc edge fades
+      // moon->glow instead of moon->dark-sky. Wide & soft like the sun's halo.
+      float h=(1.0f-(d-OCEAN_MOON_R)/(haloR-OCEAN_MOON_R))*0.6f*ocean.nightVis;
+      if(h>0){ if(h>1) h=1; leds[XY(x,y)] += CRGB((uint8_t)(col.r*h),(uint8_t)(col.g*h),(uint8_t)(col.b*h)); }
       float edge = OCEAN_MOON_R + 0.5f - d;                   // silhouette coverage (AA)
       if(edge > 0.0f){
         if(edge > 1.0f) edge = 1.0f;
         float nx=dx/R, ny=dy/R;
         float tx = a * sqrtf(1.0f - ny*ny);                  // terminator x at this row
         bool lit = waxing ? (nx >= -tx) : (nx <= tx);        // lit side of the terminator
-        // Only paint the LIT side; the dark side stays the real sky behind it
-        // (painting a flat sky colour left a patchy dark ring). edge = round AA.
+        // Paint only the LIT side; dark side keeps sky+halo behind it.
         if(lit) leds[XY(x,y)] = oceanLerpRGB(leds[XY(x,y)], col, ocean.nightVis*edge);
-      } else if(d <= OCEAN_MOON_R+2.5f){                      // soft halo
-        float h=(1.0f-(d-OCEAN_MOON_R)/2.5f)*0.4f*ocean.nightVis;
-        if(h>0) leds[XY(x,y)] += CRGB((uint8_t)(col.r*h),(uint8_t)(col.g*h),(uint8_t)(col.b*h));
       }
     }
   }
 }
 
-#define OCEAN_NUM_STARS 30
+#define OCEAN_NUM_STARS 15
 struct OceanStar { uint8_t x, y, ph; };
 static OceanStar oceanStars[OCEAN_NUM_STARS];
+static uint8_t oceanStarCount = 0;
 static bool oceanStarsInit = false;
 static void oceanInitStars(){
-  for(uint8_t i=0;i<OCEAN_NUM_STARS;i++){
-    oceanStars[i].x = random8(NUM_COLS);
-    oceanStars[i].y = random8(OCEAN_HORIZON-6);   // upper sky only
-    oceanStars[i].ph = random8();
+  oceanStarCount = 0;
+  uint16_t guard = 0;
+  while(oceanStarCount < OCEAN_NUM_STARS && guard++ < 3000){
+    uint8_t sx = random8(NUM_COLS);
+    uint8_t sy = random8(OCEAN_HORIZON-6);        // upper sky only
+    bool ok = true;                                // reject if touching another star (8-neighbour)
+    for(uint8_t i=0;i<oceanStarCount;i++){
+      int16_t ddx = (int16_t)sx - oceanStars[i].x;
+      int16_t ddy = (int16_t)sy - oceanStars[i].y;
+      if(ddx>=-1 && ddx<=1 && ddy>=-1 && ddy<=1){ ok=false; break; }
+    }
+    if(!ok) continue;
+    oceanStars[oceanStarCount].x = sx;
+    oceanStars[oceanStarCount].y = sy;
+    oceanStars[oceanStarCount].ph = random8();
+    oceanStarCount++;
   }
   oceanStarsInit = true;
 }
@@ -187,10 +203,12 @@ static void oceanDrawStars(){
   if(ocean.nightVis <= 0.01f) return;             // hidden until sun almost gone
   if(!oceanStarsInit) oceanInitStars();
   uint16_t t = millis();
-  for(uint8_t i=0;i<OCEAN_NUM_STARS;i++){
+  for(uint8_t i=0;i<oceanStarCount;i++){
     OceanStar &s = oceanStars[i];
-    uint8_t tw = sin8(s.ph*2 + t/3);              // twinkle 0..255 (faster)
-    float a = ocean.nightVis * (0.35f + tw/400.0f); // opacity follows night-visibility
+    // Twinkle: wide brightness swing (dims most of the way then flares) so it
+    // reads even under the viewer's brightness gain. Per-star speed via ph.
+    uint8_t tw = sin8((uint8_t)(s.ph*3) + (uint16_t)(t/2));
+    float a = ocean.nightVis * (0.12f + 0.88f*(tw/255.0f));
     if(a>1) a=1;
     leds[XY(s.x,s.y)] += CRGB((uint8_t)(200*a),(uint8_t)(210*a),(uint8_t)(235*a));
   }
