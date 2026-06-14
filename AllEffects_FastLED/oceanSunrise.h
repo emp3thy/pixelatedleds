@@ -106,8 +106,29 @@ static void oceanUpdateStageState(float p){
   if(oceanCloudNext <= 0.0f ){ oceanCloudNext = 0.0f;  oceanCloudDir = +1; }
 }
 
-// ---- layer stubs (filled in later tasks) ----
-static void oceanDrawClouds()      {}
+static void oceanDrawClouds(){
+  float cov = ocean.cloudCov;
+  if(cov < 5.0f) return;                          // <5% reads as clear
+  if(cov > 25.0f) cov = 25.0f;
+  // higher coverage -> lower threshold -> more cloud pixels
+  uint8_t thresh = (uint8_t)(255 - (cov/25.0f)*120.0f);   // 255(min) .. 135(max)
+  uint16_t t = millis();
+  // cloud tint: white by day, warmed toward horizon colour, dimmed at night
+  CRGB warm = ocean.skyHorizon;
+  CRGB tint = oceanLerpRGB(CRGB(235,238,245), warm, 0.45f);
+  tint = oceanLerpRGB(tint, CRGB(60,66,86), ocean.nf*0.7f);
+  for(uint8_t y=0; y<OCEAN_HORIZON-4; y++){       // sky only, leave a clear strip at horizon
+    for(uint8_t x=0;x<NUM_COLS;x++){
+      uint8_t n = inoise8(x*28 + t/20, y*28);     // drifting sideways
+      if(n <= thresh) continue;
+      float a = (n-thresh)/(float)(255-thresh);   // soft cloud edge
+      // fade clouds out near the top and the horizon strip
+      a *= 1.0f - fabsf((float)y/(OCEAN_HORIZON-4) - 0.5f)*0.6f;
+      if(a<=0) continue; if(a>1) a=1;
+      leds[XY(x,y)] = oceanLerpRGB(leds[XY(x,y)], tint, a);
+    }
+  }
+}
 
 static CRGB oceanMoonColor(){ return CRGB(0xCF,0xDA,0xF2); } // pale blue-white
 static void oceanDrawMoon(){
