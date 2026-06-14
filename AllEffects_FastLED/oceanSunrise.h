@@ -110,8 +110,36 @@ static void oceanUpdateStageState(float p){
 static void oceanDrawClouds()      {}
 static void oceanDrawStars()       {}
 static void oceanDrawMoon()        {}
-static void oceanDrawOcean()       {}
 static void oceanDrawReflections() {}
+
+static void oceanDrawOcean(){
+  uint16_t t = millis();
+  // base sea colour: darker mirror of the horizon sky, further darkened at night
+  CRGB base = ocean.skyHorizon;
+  base.nscale8_video(120);                       // ~47% brightness
+  uint8_t nightCut = (uint8_t)(ocean.nf * 70);   // darker at night
+  for(uint8_t y=OCEAN_HORIZON; y<NUM_ROWS; y++){
+    // depth 0 at horizon -> 1 at bottom; deeper = a touch darker
+    float depth = (float)(y-OCEAN_HORIZON)/(float)(NUM_ROWS-1-OCEAN_HORIZON);
+    for(uint8_t x=0;x<NUM_COLS;x++){
+      // slow horizontal wave bands
+      uint8_t w = sin8(x*6 + y*10 + t/12);       // 0..255
+      CRGB c = base;
+      c.nscale8_video(200 - (uint8_t)(depth*40));
+      // wave brightness ripple +/-
+      int16_t lift = ((int16_t)w - 128) / 6;     // about +/-21
+      c.r = qadd8(c.r, lift>0?lift:0); c.r = qsub8(c.r, lift<0?-lift:0);
+      c.g = qadd8(c.g, lift>0?lift:0); c.g = qsub8(c.g, lift<0?-lift:0);
+      c.b = qadd8(c.b, lift>0?lift:0); c.b = qsub8(c.b, lift<0?-lift:0);
+      if(nightCut){ c.nscale8_video(255-nightCut); }
+      leds[XY(x,y)] = c;
+      // occasional white foam on crests
+      if(w > 240 && random8() < 6){
+        leds[XY(x,y)] += CRGB(60,60,70);
+      }
+    }
+  }
+}
 
 // additive write into a sky pixel, clamped
 static inline void oceanAddPix(int16_t x,int16_t y,const CRGB&col,float a){
