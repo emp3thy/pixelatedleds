@@ -110,7 +110,34 @@ static void oceanUpdateStageState(float p){
 static void oceanDrawClouds()      {}
 static void oceanDrawStars()       {}
 static void oceanDrawMoon()        {}
-static void oceanDrawReflections() {}
+
+static CRGB oceanSunColor();   // defined with the sun layer below
+
+// additive shimmer column on the sea directly below a sky object at column cx.
+static void oceanReflect(uint8_t cx, CRGB col, float strength){
+  if(strength <= 0.0f) return;
+  uint16_t t = millis();
+  for(uint8_t y=OCEAN_HORIZON; y<NUM_ROWS; y++){
+    float depth = (float)(y-OCEAN_HORIZON)/(float)(NUM_ROWS-OCEAN_HORIZON);
+    float fade  = (1.0f - depth) * strength;                 // fades downward
+    uint8_t wob = sin8(y*30 + t/9);                          // vertical wobble
+    float width = 1.5f + depth*3.0f;                         // widens with depth
+    for(int16_t x=cx-(int16_t)width; x<=cx+(int16_t)width; x++){
+      if(x<0||x>=NUM_COLS) continue;
+      float dxn = 1.0f - fabsf((float)(x-(int)cx))/(width+0.5f);
+      float a = fade * dxn * (0.5f + wob/512.0f);
+      if(a<=0) continue; if(a>1) a=1;
+      leds[XY(x,y)] += CRGB((uint8_t)(col.r*a),(uint8_t)(col.g*a),(uint8_t)(col.b*a));
+    }
+  }
+}
+
+static void oceanDrawReflections(){
+  if(ocean.sunUp){
+    float lowness = 1.0f - oceanSmooth(ocean.alt);          // strongest when low
+    oceanReflect(OCEAN_SUN_X, oceanSunColor(), 0.25f + lowness*0.75f);
+  }
+}
 
 static void oceanDrawOcean(){
   uint16_t t = millis();
