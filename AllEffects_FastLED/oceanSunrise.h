@@ -108,7 +108,34 @@ static void oceanUpdateStageState(float p){
 
 // ---- layer stubs (filled in later tasks) ----
 static void oceanDrawClouds()      {}
-static void oceanDrawMoon()        {}
+
+static CRGB oceanMoonColor(){ return CRGB(0xCF,0xDA,0xF2); } // pale blue-white
+static void oceanDrawMoon(){
+  if(ocean.nf <= 0.01f) return;
+  float ph = (float)(oceanDayCount % 30) / 30.0f;            // 0 full .. 0.5 new .. 1 full
+  float a  = cosf(2.0f*3.14159f*ph);                          // +1 full .. -1 new (terminator scale)
+  bool  waxing = ph > 0.5f;                                   // 0.5..1 grows back toward full
+  CRGB col = oceanMoonColor();
+  CRGB skyHere = oceanLerpRGB(ocean.skyTop, ocean.skyHorizon,
+                              (float)OCEAN_MOON_Y/(float)(OCEAN_HORIZON-1));
+  float R = OCEAN_MOON_R;
+  for(int16_t y=OCEAN_MOON_Y-OCEAN_MOON_R-3; y<=OCEAN_MOON_Y+OCEAN_MOON_R+3; y++){
+    if(y<0||y>=OCEAN_HORIZON) continue;
+    for(int16_t x=OCEAN_MOON_X-OCEAN_MOON_R-3; x<=OCEAN_MOON_X+OCEAN_MOON_R+3; x++){
+      if(x<0||x>=NUM_COLS) continue;
+      float dx=x-OCEAN_MOON_X, dy=y-OCEAN_MOON_Y, d=sqrtf(dx*dx+dy*dy);
+      if(d <= OCEAN_MOON_R){
+        float nx=dx/R, ny=dy/R;
+        float tx = a * sqrtf(1.0f - ny*ny);                  // terminator x at this row
+        bool lit = waxing ? (nx >= -tx) : (nx <= tx);        // lit side of the terminator
+        leds[XY(x,y)] = oceanLerpRGB(leds[XY(x,y)], lit?col:skyHere, ocean.nf);
+      } else if(d <= OCEAN_MOON_R+2.5f){                      // soft halo
+        float h=(1.0f-(d-OCEAN_MOON_R)/2.5f)*0.4f*ocean.nf;
+        if(h>0) leds[XY(x,y)] += CRGB((uint8_t)(col.r*h),(uint8_t)(col.g*h),(uint8_t)(col.b*h));
+      }
+    }
+  }
+}
 
 #define OCEAN_NUM_STARS 30
 struct OceanStar { uint8_t x, y, ph; };
@@ -160,6 +187,9 @@ static void oceanDrawReflections(){
   if(ocean.sunUp){
     float lowness = 1.0f - oceanSmooth(ocean.alt);          // strongest when low
     oceanReflect(OCEAN_SUN_X, oceanSunColor(), 0.25f + lowness*0.75f);
+  }
+  if(ocean.nf > 0.01f){
+    oceanReflect(OCEAN_MOON_X, oceanMoonColor(), 0.30f * ocean.nf);
   }
 }
 
