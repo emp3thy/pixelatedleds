@@ -36,8 +36,8 @@ cycle) drift across the sky tinted by the current light.
   | Night | 0.62 – 1.00 | sun gone, moon + stars, dark blue |
 - **Cycle wrap detection:** when `phase` wraps from ~1.0 back toward 0, run
   once-per-cycle updates:
-  - Re-roll cloud coverage (see Clouds).
   - Increment `dayCount`; `moonPhase = (dayCount % 30) / 30.0` (0 = full, waxes/wanes across 30 cycles).
+  - (Cloud coverage steps at each phase/stage transition, not at the wrap — see Clouds.)
 - **Night factor** `nf ∈ [0,1]`: 0 during day, ramps to 1 across sunset, holds
   1 through night, ramps to 0 across sunrise. Drives stars + moon opacity and
   ocean darkness.
@@ -63,11 +63,23 @@ Draw order (back → front):
    - Day: top `#2F7FD6` → horizon `#D8F0FF`.
    - Sunset: top `#2E2350` → horizon `#FFCE5A` (via red/orange mid).
    - Night: top `#04050C`-ish lifted to a projectable navy → horizon `#122044`.
-2. **Clouds** — soft Perlin-noise patches confined to the sky region. Per-cycle
-   coverage `c%` rolled uniform [0,25]; clamp rule: `c < 5 → 0`, `c > 25 → 25`.
-   Coverage thresholds the noise field (higher coverage → lower threshold → more
-   cloud). Clouds drift slowly sideways. Tinted to the current sky/light: grey-
-   white by day, pink/gold edges at dawn & sunset, dim grey-blue at night.
+2. **Clouds** — soft Perlin-noise patches confined to the sky region. Coverage
+   follows a **predictable triangular cycle** between 0% and 25% with a
+   *randomized step size* so the period varies while the shape stays consistent
+   (always a full ramp up, then a full ramp down). A direction flag (rising /
+   falling) is held until a bound is hit. **At each phase/stage transition —
+   sunrise, day, sunset, night (4 stages per day-cycle)** — the coverage target
+   moves by `rand(1..3%)` in the current direction (e.g. sunrise 5% → day 8%);
+   on reaching ≥25% it clamps to 25 and flips to falling, on reaching ≤0% it
+   clamps to 0 and flips to rising. The rendered coverage **eases smoothly**
+   toward the target between stages, so change is continuous, not stepped.
+   Render clamp on the eased value: `< 5% → 0%` (natural clear spells near the
+   trough), `> 25% → 25%`. Deterministic shape (no jarring jumps); only the pace
+   varies. Closing the 5→25 gap takes ~6–7 stages (~2 day-cycles); a full
+   0→25→0 spans ~a dozen stages (~3 day-cycles). Coverage thresholds the noise
+   field (higher coverage → lower threshold → more cloud). Clouds drift slowly
+   sideways. Tinted to the current sky/light: grey-white by day, pink/gold edges
+   at dawn & sunset, dim grey-blue at night.
 3. **Stars** — ~30 fixed pseudo-random points in the upper sky. Each twinkles
    (per-star sine of time). Opacity = `nf` (only visible at night).
 4. **Moon** — pale blue-white disc, radius ≈ 3 (≈6px across), at the fixed right
@@ -120,6 +132,38 @@ Full-canvas float compute per frame across ~7 layers over 3600 pixels. In line
 with the existing float-heavy effects (voronoi, aurora, kusama) which run at
 60–140 fps in the sim. Teensy 4.0 has an FPU; acceptable. If hardware fps is
 low, the cloud/reflection layers can be throttled or simplified.
+
+## Assumptions (defaults — flag any to change)
+
+Baked-in defaults not explicitly confirmed. Most are safe or tuning knobs; the
+**bold** ones are deliberate calls worth a second look.
+
+**Sizes & positions**
+- Horizon at row 45 exactly (15 ocean rows = bottom 1/4).
+- Sun disc radius ~5px; moon radius ~3px (smaller than sun).
+- Sun "stays high" peak at row ~8 (near top).
+- **Moon fixed on the right side, ~(x44, y12)** ("off to one side" → right chosen).
+
+**Timing**
+- **Cycle period = 210s** (3.5 min, middle of the 3–4 min range).
+- Lunar cycle = 30 day-cycles (1 day-cycle = 1 lunar day).
+- Cloud coverage starts low and rising at startup.
+
+**Counts & rates**
+- ~30 stars, fixed positions, twinkle only (don't move).
+- Foam = sparse/brief white sparkle (exact rate tuned later).
+- Sunburst ray count/length tuned later.
+
+**Behaviour**
+- Sun reflection strong only when the sun is low (fades as it climbs); moon
+  reflection dimmer/white.
+- Sun fully hidden at night; moon + stars fully hidden by day (crossfade via
+  night-factor across sunset/sunrise).
+- **Waves are brightness ripples only — the horizon line stays flat** (no wavy
+  coastline / waterline).
+- Effect auto-runs; no manual time-of-day control. Single slider slot #25;
+  black stays last.
+- Exact palette crossfade control-points are tuning details, not fixed here.
 
 ## Out of Scope (YAGNI)
 
