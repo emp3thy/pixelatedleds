@@ -208,7 +208,7 @@ static void oceanDrawStars(){
     // Twinkle: wide brightness swing (dims most of the way then flares) so it
     // reads even under the viewer's brightness gain. Per-star speed via ph.
     uint8_t tw = sin8((uint8_t)(s.ph*3) + (uint16_t)(t/2));
-    float a = ocean.nightVis * (0.12f + 0.88f*(tw/255.0f));
+    float a = ocean.nightVis * (0.55f + 0.45f*(tw/255.0f));
     if(a>1) a=1;
     leds[XY(s.x,s.y)] += CRGB((uint8_t)(200*a),(uint8_t)(210*a),(uint8_t)(235*a));
   }
