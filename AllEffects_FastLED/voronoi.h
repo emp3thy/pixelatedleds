@@ -1,14 +1,15 @@
 #pragma once
 #include <FastLED.h>
+#include <math.h>
 #include "configuration.h"
 #include "XYMatrix.h"
 
 #define VORONOI_SEEDS 6
 
 struct VoronoiSeed {
-  uint8_t x, y;
+  float x, y;       // sub-pixel position → boundaries shift gradually
+  float dx, dy;     // velocity in px per frame (small = languid)
   uint8_t hue;
-  int8_t dx, dy;
 };
 
 static VoronoiSeed voronoiSeeds[VORONOI_SEEDS];
@@ -20,9 +21,9 @@ static void voronoiInit() {
     voronoiSeeds[i].y = random8(NUM_ROWS);
     voronoiSeeds[i].hue = random8();
     do {
-      voronoiSeeds[i].dx = (int8_t)random8(3) - 1;
-      voronoiSeeds[i].dy = (int8_t)random8(3) - 1;
-    } while (voronoiSeeds[i].dx == 0 && voronoiSeeds[i].dy == 0);
+      voronoiSeeds[i].dx = ((int)random8(41) - 20) / 100.0f;  // -0.20..0.20 px/frame
+      voronoiSeeds[i].dy = ((int)random8(41) - 20) / 100.0f;
+    } while (fabsf(voronoiSeeds[i].dx) < 0.04f && fabsf(voronoiSeeds[i].dy) < 0.04f);
   }
   voronoiInited = true;
 }
@@ -30,36 +31,34 @@ static void voronoiInit() {
 void voronoi() {
   if (!voronoiInited) voronoiInit();
 
-  // drift seeds every 120ms
+  // Drift every frame in sub-pixel steps → smooth motion; bounce off edges.
+  for (uint8_t i = 0; i < VORONOI_SEEDS; i++) {
+    VoronoiSeed &s = voronoiSeeds[i];
+    s.x += s.dx; s.y += s.dy;
+    if (s.x < 0)            { s.x = 0;            s.dx = -s.dx; }
+    if (s.x > NUM_COLS - 1) { s.x = NUM_COLS - 1; s.dx = -s.dx; }
+    if (s.y < 0)            { s.y = 0;            s.dy = -s.dy; }
+    if (s.y > NUM_ROWS - 1) { s.y = NUM_ROWS - 1; s.dy = -s.dy; }
+  }
   EVERY_N_MILLISECONDS(120) {
-    for (uint8_t i = 0; i < VORONOI_SEEDS; i++) {
-      VoronoiSeed &s = voronoiSeeds[i];
-      int16_t nx = (int16_t)s.x + s.dx;
-      int16_t ny = (int16_t)s.y + s.dy;
-      if (nx < 0 || nx >= NUM_COLS) { s.dx = -s.dx; nx = (int16_t)s.x + s.dx; }
-      if (ny < 0 || ny >= NUM_ROWS) { s.dy = -s.dy; ny = (int16_t)s.y + s.dy; }
-      s.x = (uint8_t)nx;
-      s.y = (uint8_t)ny;
-      s.hue += 1;
-    }
+    for (uint8_t i = 0; i < VORONOI_SEEDS; i++) voronoiSeeds[i].hue += 1;
   }
 
-  // per-pixel: paint with nearest seed's hue
+  // Per-pixel: nearest seed's hue (float distance for smoothly moving cells).
   for (uint8_t y = 0; y < NUM_ROWS; y++) {
     for (uint8_t x = 0; x < NUM_COLS; x++) {
-      uint16_t bestD = 65535;
+      float bestD = 1e9f;
       uint8_t bestHue = 0;
       for (uint8_t i = 0; i < VORONOI_SEEDS; i++) {
-        int16_t ddx = (int16_t)x - voronoiSeeds[i].x;
-        int16_t ddy = (int16_t)y - voronoiSeeds[i].y;
-        uint16_t d = (uint16_t)(ddx * ddx + ddy * ddy);
-        if (d < bestD) {
-          bestD = d;
-          bestHue = voronoiSeeds[i].hue;
-        }
+        float ddx = (float)x - voronoiSeeds[i].x;
+        float ddy = (float)y - voronoiSeeds[i].y;
+        float d = ddx * ddx + ddy * ddy;
+        if (d < bestD) { bestD = d; bestHue = voronoiSeeds[i].hue; }
       }
       leds[XY(x, y)] = CHSV(bestHue, 220, 255);
     }
   }
+
+  blur2d(leds, NUM_COLS, NUM_ROWS, 40);   // soften the hard cell edges
   FastLED.show();
 }

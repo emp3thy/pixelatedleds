@@ -1,6 +1,8 @@
 #pragma once
 
 #include <FastLED.h>
+#include "configuration.h"
+#include "XYMatrix.h"
 // *** PACIFICA ****
 
 CRGBPalette16 pacifica_palette_1 =
@@ -19,18 +21,23 @@ CRGBPalette16 pacifica_palette_3 =
 // Add one layer of waves into the led array
 void pacifica_one_layer( CRGBPalette16 & p, uint16_t cistart, uint16_t wavescale, uint8_t bri, uint16_t ioff)
 {
-  uint16_t ci = cistart;
-  uint16_t waveangle = ioff;
   uint16_t wavescale_half = (wavescale / 2) + 20;
-  for ( uint16_t i = 0; i < NUM_LEDS; i++) {
-    waveangle += 250;
-    uint16_t s16 = sin16( waveangle ) + 32768;
-    uint16_t cs = scale16( s16 , wavescale_half ) + wavescale_half;
-    ci += cs;
-    uint16_t sindex16 = sin16( ci) + 32768;
-    uint8_t sindex8 = scale16( sindex16, 240);
-    CRGB c = ColorFromPalette( p, sindex8, bri, LINEARBLEND);
-    leds[i] += c;
+  // Run a vertical 1D pacifica up each column, with a per-column phase offset so
+  // the four layers form an organic 2D ocean. Write via XY() — raw leds[] order
+  // is lane-major/serpentine and would scramble the waves.
+  for ( uint8_t x = 0; x < NUM_COLS; x++) {
+    uint16_t ci = cistart + (uint16_t)x * 1024;       // decorrelate columns
+    uint16_t waveangle = ioff + (uint16_t)x * 250;
+    for ( uint8_t y = 0; y < NUM_ROWS; y++) {
+      waveangle += 250;
+      uint16_t s16 = sin16( waveangle ) + 32768;
+      uint16_t cs = scale16( s16 , wavescale_half ) + wavescale_half;
+      ci += cs;
+      uint16_t sindex16 = sin16( ci) + 32768;
+      uint8_t sindex8 = scale16( sindex16, 240);
+      CRGB c = ColorFromPalette( p, sindex8, bri, LINEARBLEND);
+      leds[XY(x, y)] += c;
+    }
   }
 }
 
@@ -56,9 +63,9 @@ void pacifica_add_whitecaps()
 void pacifica_deepen_colors()
 {
   for ( uint16_t i = 0; i < NUM_LEDS; i++) {
-    leds[i].blue = scale8( leds[i].blue,  145);
-    leds[i].green = scale8( leds[i].green, 200);
-    leds[i] |= CRGB( 2, 5, 7);
+    leds[i].blue = scale8( leds[i].blue,  235);   // less darkening -> brighter, clearer water
+    leds[i].green = scale8( leds[i].green, 248);
+    leds[i] |= CRGB( 3, 8, 12);
   }
 }
 
@@ -85,10 +92,10 @@ void pacifica_loop()
   fill_solid( leds, NUM_LEDS, CRGB( 2, 6, 10));
 
   // Render each of four layers, with different scales and speeds, that vary over time
-  pacifica_one_layer( pacifica_palette_1, sCIStart1, beatsin16( 3, 11 * 256, 14 * 256), beatsin8( 10, 70, 130), 0 - beat16( 301) );
-  pacifica_one_layer( pacifica_palette_2, sCIStart2, beatsin16( 4,  6 * 256,  9 * 256), beatsin8( 17, 40,  80), beat16( 401) );
-  pacifica_one_layer( pacifica_palette_3, sCIStart3, 6 * 256, beatsin8( 9, 10, 38), 0 - beat16(503));
-  pacifica_one_layer( pacifica_palette_3, sCIStart4, 5 * 256, beatsin8( 8, 10, 28), beat16(601));
+  pacifica_one_layer( pacifica_palette_1, sCIStart1, beatsin16( 3, 11 * 256, 14 * 256), beatsin8( 10, 132, 205), 0 - beat16( 301) );
+  pacifica_one_layer( pacifica_palette_2, sCIStart2, beatsin16( 4,  6 * 256,  9 * 256), beatsin8( 17, 88, 160), beat16( 401) );
+  pacifica_one_layer( pacifica_palette_3, sCIStart3, 6 * 256, beatsin8( 9, 34, 78), 0 - beat16(503));
+  pacifica_one_layer( pacifica_palette_3, sCIStart4, 5 * 256, beatsin8( 8, 34, 70), beat16(601));
 
   // Add brighter 'whitecaps' where the waves lines up more
   pacifica_add_whitecaps();

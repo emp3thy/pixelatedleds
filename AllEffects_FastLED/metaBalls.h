@@ -6,35 +6,41 @@ byte dist (uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)  {
   int b = x2 - x1;
   a *= a;
   b *= b;
-  byte dist = 220 / sqrt16(a + b);
+  uint8_t r = sqrt16(a + b);
+  // r==0 when the pixel sits exactly on the ball centre. 160/0 is undefined on
+  // AVR and traps ("divide by zero") under WASM/emscripten — clamp to max here.
+  // Numerator lowered (was 220) so more balls don't saturate the field to white.
+  byte dist = r ? (160 / r) : 160;
   return dist;
 }
+
+// More balls, slower drift. beatsin8 BPMs are low (5..11) so the blobs ooze.
+#define NUM_METABALLS 9
+
 void metaBalls()
 {
-  uint8_t bx1 = beatsin8(15, 0, NUM_COLS - 1, 0, 0);
-  uint8_t by1 = beatsin8(18, 0, NUM_ROWS - 1, 0, 0);
-  uint8_t bx2 = beatsin8(28, 0, NUM_COLS - 1, 0, 4);
-  uint8_t by2 = beatsin8(23, 0, NUM_ROWS - 1, 0, 4);
-  uint8_t bx3 = beatsin8(30, 0, NUM_COLS - 1, 0, 8);
-  uint8_t by3 = beatsin8(24, 0, NUM_ROWS - 1, 0, 8);
-  uint8_t bx4 = beatsin8(17, 0, NUM_COLS - 1, 0, 16);
-  uint8_t by4 = beatsin8(25, 0, NUM_ROWS - 1, 0, 16);
-  uint8_t bx5 = beatsin8(19, 0, NUM_COLS - 1, 0, 22);
-  uint8_t by5 = beatsin8(21, 0, NUM_ROWS - 1, 0, 22);
+  static const uint8_t bpmX[NUM_METABALLS]  = { 7, 9, 6, 8, 5, 10, 7, 9, 6 };
+  static const uint8_t bpmY[NUM_METABALLS]  = { 8, 6, 9, 5, 11, 7, 6, 8, 9 };
+  static const uint8_t phase[NUM_METABALLS] = { 0, 4, 8, 16, 22, 30, 40, 50, 60 };
+
+  uint8_t bx[NUM_METABALLS], by[NUM_METABALLS];
+  for (uint8_t k = 0; k < NUM_METABALLS; k++) {
+    bx[k] = beatsin8(bpmX[k], 0, NUM_COLS - 1, 0, phase[k]);
+    by[k] = beatsin8(bpmY[k], 0, NUM_ROWS - 1, 0, (uint8_t)(phase[k] + 7));
+  }
 
   for (int i = 0; i < NUM_COLS; i++)    {
     for (int j = 0; j < NUM_ROWS; j++) {
+      byte sum = 0;
+      for (uint8_t k = 0; k < NUM_METABALLS; k++)
+        sum = qadd8(sum, dist(i, j, bx[k], by[k]));
 
-      byte  sum =  dist(i, j, bx1, by1);
-      sum = qadd8(sum, dist(i, j, bx2, by2));
-      sum = qadd8(sum, dist(i, j, bx3, by3));
-      sum = qadd8(sum, dist(i, j, bx4, by4));
-      sum = qadd8(sum, dist(i, j, bx5, by5));
-
-      leds[XY (i, j)] =  ColorFromPalette(HeatColors_p, sum + 165, BRIGHTNESS);
+      // Use the field value directly (small lift) as the heat index — keeps
+      // saturated reds/oranges with bright cores instead of washed-out white.
+      leds[XY (i, j)] = ColorFromPalette(HeatColors_p, qadd8(sum, 40), 255);
     }
   }
 
-  blur2d(leds, NUM_COLS, NUM_ROWS, 32 );
+  blur2d(leds, NUM_COLS, NUM_ROWS, 20 );
   FastLED.show();
 }

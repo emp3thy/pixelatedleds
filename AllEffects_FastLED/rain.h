@@ -6,20 +6,24 @@ byte rain[NUM_LEDS];
 byte speed = 2;
 int rainTick=0;
 
+// Adapter so blurRows knows our (lane-major) array layout: forward to XY().
+static uint16_t rainXYFunc(uint16_t x, uint16_t y, uint16_t, uint16_t) { return XY((uint8_t)x, (uint8_t)y); }
+
 void updaterain() {
   for (byte i = 0; i < NUM_COLS; i++) {
     for (byte j = 0; j < NUM_ROWS; j++) {
-      byte layer = rain[XY(i, ((j + speed + random8(2) + NUM_ROWS) % NUM_ROWS))];   //fake scroll based on shift coordinate
+      byte layer = rain[XY(i, ((j + 2 * NUM_ROWS - speed - random8(2)) % NUM_ROWS))];   //fake scroll (downward) based on shift coordinate
       // random8(2) add glitchy look
       if (layer) {
-        leds[XY(i,j)] = CHSV(141, 255, BRIGHTNESS);
+        leds[XY(i,j)] = CHSV(141, 255, 255);   // full value; global setBrightness dims
       }
     }
   }
 
   speed = (speed + 1) % NUM_ROWS;
   fadeToBlackBy(leds, NUM_LEDS, 40);
-  blurRows(leds, NUM_COLS, NUM_ROWS, 16);      //if you want
+  static XYMap rainMap = XYMap::constructWithUserFunction(NUM_COLS, NUM_ROWS, rainXYFunc);
+  blurRows(leds, NUM_COLS, NUM_ROWS, 16, rainMap);   // 3.10.3 needs the XYMap arg
   FastLED.show();
 } //updaterain
 

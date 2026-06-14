@@ -3,9 +3,11 @@
 #include "configuration.h"
 #include "XYMatrix.h"
 
-#define MONDRIAN_MAX_LEAVES 6
-#define MONDRIAN_MAX_DEPTH  2
-#define MONDRIAN_WORK_STACK 3
+// Mondrian: recursive-rectangle subdivision with white grid lines.
+// Teensy 4.0 has ~1MB RAM, so the old AVR Uno leaf/depth caps are gone.
+#define MONDRIAN_MAX_LEAVES 24   // hard ceiling on rectangles
+#define MONDRIAN_MIN_W      5    // min rect width  (incl. its white border)
+#define MONDRIAN_MIN_H      5    // min rect height (incl. its white border)
 
 struct MondrianLeaf {
   uint8_t x, y, w, h;
@@ -16,78 +18,131 @@ static MondrianLeaf mondrianLeaves[MONDRIAN_MAX_LEAVES];
 static uint8_t mondrianLeafCount = 0;
 static unsigned long mondrianLastRegen = 0;
 
-static CRGB mondrianPickColor() {
-  uint8_t r = random8();
-  if (r < 153) return CRGB(255, 255, 255); // 60% white
-  if (r < 186) return CRGB(220, 0, 0);     // 13% red
-  if (r < 219) return CRGB(240, 200, 0);   // 13% yellow
-  if (r < 252) return CRGB(0, 0, 220);     // 13% blue
-  return CRGB(0, 0, 0);                    // ~1.5% black
+// Block palette as indexed colours so the colourer can avoid same-colour
+// neighbours. Grid lines are white; no black (per request).
+static const CRGB MONDRIAN_PALETTE[3] = {
+  CRGB(220, 0, 0),     // red
+  CRGB(240, 200, 0),   // yellow
+  CRGB(0, 40, 220),    // blue
+};
+
+// Do two leaves share an edge? Rects tile the grid with no gaps, so two are
+// "adjacent" when their bounds touch along a horizontal or vertical seam.
+static bool mondrianAdjacent(const MondrianLeaf &a, const MondrianLeaf &b) {
+  bool xOverlap = (a.x < b.x + b.w) && (b.x < a.x + a.w);
+  bool yOverlap = (a.y < b.y + b.h) && (b.y < a.y + a.h);
+  bool vTouch = (a.y + a.h == b.y) || (b.y + b.h == a.y); // stacked
+  bool hTouch = (a.x + a.w == b.x) || (b.x + b.w == a.x); // side by side
+  return (xOverlap && vTouch) || (yOverlap && hTouch);
 }
 
-static void mondrianEmitLeaf(uint8_t x, uint8_t y, uint8_t w, uint8_t h) {
-  if (mondrianLeafCount >= MONDRIAN_MAX_LEAVES) return;
-  mondrianLeaves[mondrianLeafCount++] = { x, y, w, h, mondrianPickColor() };
-}
-
-// Iterative subdivision via a small explicit work stack — avoids deep recursion
-// that would overflow the AVR Uno's tiny SRAM stack budget. The work-stack array
-// is `static` so it lives in .bss rather than on the hardware stack.
-struct MondrianWorkItem { uint8_t x, y, w, h, depth; };
-static MondrianWorkItem mondrianWorkStack[MONDRIAN_WORK_STACK];
-
+// Subdivide into a random target count of rectangles, then colour them.
+// No recursion — everything lives in the fixed mondrianLeaves array.
 static void mondrianRegen() {
-  uint8_t sp = 0;
+  mondrianLeafCount = 1;
+  mondrianLeaves[0] = { 0, 0, NUM_COLS, NUM_ROWS, CRGB::Black };
 
-  mondrianLeafCount = 0;
-  mondrianWorkStack[sp++] = { 0, 0, NUM_COLS, NUM_ROWS, 0 };
+  uint8_t target = random8(14, MONDRIAN_MAX_LEAVES + 1); // 14..24 blocks
 
-  while (sp > 0 && mondrianLeafCount < MONDRIAN_MAX_LEAVES) {
-    MondrianWorkItem cur = mondrianWorkStack[--sp];
-
-    if (cur.depth >= MONDRIAN_MAX_DEPTH || (cur.w <= 4 && cur.h <= 2)) {
-      mondrianEmitLeaf(cur.x, cur.y, cur.w, cur.h);
-      continue;
+  uint16_t guard = 0;
+  while (mondrianLeafCount < target && guard++ < 600) {
+    // Area-weighted pick among splittable rects: big rects split more often,
+    // but small ones still get chosen — yields a mix of block sizes instead of
+    // everything trending toward equal.
+    uint32_t totalArea = 0;
+    for (uint8_t i = 0; i < mondrianLeafCount; i++) {
+      MondrianLeaf &L = mondrianLeaves[i];
+      if (L.w >= 2 * MONDRIAN_MIN_W || L.h >= 2 * MONDRIAN_MIN_H)
+        totalArea += (uint32_t)L.w * L.h;
     }
+    if (totalArea == 0) break; // nothing left big enough to split
 
-    bool splitVert;
-    if (cur.w >= 2 * cur.h) splitVert = true;
-    else if (cur.h >= 2 * cur.w) splitVert = false;
-    else splitVert = random8(2);
-
-    bool didSplit = false;
-    if (splitVert && cur.w >= 4 && sp + 2 <= MONDRIAN_WORK_STACK) {
-      uint8_t at = random8(2, cur.w - 1);
-      mondrianWorkStack[sp++] = { cur.x, cur.y, at, cur.h, (uint8_t)(cur.depth + 1) };
-      mondrianWorkStack[sp++] = { (uint8_t)(cur.x + at), cur.y, (uint8_t)(cur.w - at), cur.h, (uint8_t)(cur.depth + 1) };
-      didSplit = true;
-    } else if (!splitVert && cur.h >= 3 && sp + 2 <= MONDRIAN_WORK_STACK) {
-      uint8_t at = random8(1, cur.h - 1);
-      mondrianWorkStack[sp++] = { cur.x, cur.y, cur.w, at, (uint8_t)(cur.depth + 1) };
-      mondrianWorkStack[sp++] = { cur.x, (uint8_t)(cur.y + at), cur.w, (uint8_t)(cur.h - at), (uint8_t)(cur.depth + 1) };
-      didSplit = true;
+    uint32_t pickT = random16() % totalArea;
+    int best = -1;
+    for (uint8_t i = 0; i < mondrianLeafCount; i++) {
+      MondrianLeaf &L = mondrianLeaves[i];
+      if (!(L.w >= 2 * MONDRIAN_MIN_W || L.h >= 2 * MONDRIAN_MIN_H)) continue;
+      uint32_t area = (uint32_t)L.w * L.h;
+      if (pickT < area) { best = i; break; }
+      pickT -= area;
     }
+    if (best < 0) break;
 
-    if (!didSplit) {
-      mondrianEmitLeaf(cur.x, cur.y, cur.w, cur.h);
+    MondrianLeaf L = mondrianLeaves[best];
+    bool canV = L.w >= 2 * MONDRIAN_MIN_W;
+    bool canH = L.h >= 2 * MONDRIAN_MIN_H;
+    // 50/50 axis when both possible → more varied aspect ratios.
+    bool splitVert = canV && (!canH || random8(2));
+
+    if (splitVert) {
+      uint8_t at = random8(MONDRIAN_MIN_W, L.w - MONDRIAN_MIN_W + 1); // [MIN_W, w-MIN_W]
+      mondrianLeaves[best] = { L.x, L.y, at, L.h, CRGB::Black };
+      mondrianLeaves[mondrianLeafCount++] =
+          { (uint8_t)(L.x + at), L.y, (uint8_t)(L.w - at), L.h, CRGB::Black };
+    } else {
+      uint8_t at = random8(MONDRIAN_MIN_H, L.h - MONDRIAN_MIN_H + 1); // [MIN_H, h-MIN_H]
+      mondrianLeaves[best] = { L.x, L.y, L.w, at, CRGB::Black };
+      mondrianLeaves[mondrianLeafCount++] =
+          { L.x, (uint8_t)(L.y + at), L.w, (uint8_t)(L.h - at), CRGB::Black };
+    }
+  }
+
+  // Greedy colouring: each block avoids the colours of its already-coloured
+  // neighbours, so reds/yellows/blues stay interspersed instead of pooling.
+  uint8_t colorIdx[MONDRIAN_MAX_LEAVES];
+  for (uint8_t i = 0; i < mondrianLeafCount; i++) {
+    bool blocked[3] = { false, false, false };
+    for (uint8_t j = 0; j < i; j++)
+      if (mondrianAdjacent(mondrianLeaves[i], mondrianLeaves[j]))
+        blocked[colorIdx[j]] = true;
+    uint8_t allowed[3], n = 0;
+    for (uint8_t c = 0; c < 3; c++) if (!blocked[c]) allowed[n++] = c;
+    uint8_t pick = (n > 0) ? allowed[random8(n)] : random8(3); // fallback if hemmed in
+    colorIdx[i] = pick;
+    mondrianLeaves[i].color = MONDRIAN_PALETTE[pick];
+  }
+}
+
+// Paint the current layout. amt==255 → hard set; else blend each cell toward it.
+static void mondrianPaint(uint8_t amt) {
+  for (uint8_t i = 0; i < mondrianLeafCount; i++) {
+    MondrianLeaf &L = mondrianLeaves[i];
+    for (uint8_t cx = L.x; cx < L.x + L.w; cx++) {
+      for (uint8_t cy = L.y; cy < L.y + L.h; cy++) {
+        // 1px white outline on all four sides of every block.
+        bool edge = (cx == L.x) || (cx == L.x + L.w - 1) ||
+                    (cy == L.y) || (cy == L.y + L.h - 1);
+        CRGB target = edge ? CRGB(255, 255, 255) : L.color;
+        if (amt >= 255) leds[XY(cx, cy)] = target;
+        else            nblend(leds[XY(cx, cy)], target, amt);
+      }
     }
   }
 }
 
 void mondrian() {
-  if (mondrianLastRegen == 0 || millis() - mondrianLastRegen > 10000) {
-    mondrianRegen();
-    mondrianLastRegen = millis();
+  static uint8_t phase = 0;   // 0 = steady, 1 = fade OUT to white, 2 = fade IN to new
+  static uint8_t step = 0;
+  unsigned long now = millis();
+
+  if (mondrianLastRegen == 0) {
+    mondrianRegen(); mondrianLastRegen = now; mondrianPaint(255); FastLED.show(); return;
   }
-  for (uint8_t i = 0; i < mondrianLeafCount; i++) {
-    MondrianLeaf &L = mondrianLeaves[i];
-    for (uint8_t cx = L.x; cx < L.x + L.w; cx++) {
-      for (uint8_t cy = L.y; cy < L.y + L.h; cy++) {
-        bool border = (cx == L.x + L.w - 1 && L.x + L.w < NUM_COLS) ||
-                      (cy == L.y + L.h - 1 && L.y + L.h < NUM_ROWS);
-        leds[XY(cx, cy)] = border ? CRGB(0, 0, 0) : L.color;
-      }
-    }
+
+  if (phase == 0) {
+    if (now - mondrianLastRegen > 10000) { phase = 1; step = 0; } // time to cycle
+    else { mondrianPaint(255); FastLED.show(); return; }
   }
-  FastLED.show();
+  if (phase == 1) {                         // fade OUT to white
+    for (uint16_t i = 0; i < NUM_LEDS; i++) nblend(leds[i], CRGB::White, 50);
+    FastLED.show();
+    if (++step >= 10) { mondrianRegen(); phase = 2; step = 0; } // new layout ready
+    return;
+  }
+  if (phase == 2) {                         // fade IN from white to the new layout
+    mondrianPaint(45);
+    FastLED.show();
+    if (++step >= 10) { mondrianPaint(255); FastLED.show(); mondrianLastRegen = now; phase = 0; }
+    return;
+  }
 }

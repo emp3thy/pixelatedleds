@@ -9,3 +9,6 @@ build/
 *.with_bootloader.hex
 .vscode/
 .idea/
+.build/
+.sim/
+.superpowers/
