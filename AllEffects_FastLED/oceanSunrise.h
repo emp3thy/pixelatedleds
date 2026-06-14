@@ -16,7 +16,7 @@
 #define OCEAN_MOON_X    44        // moon centre column (right side)
 #define OCEAN_MOON_Y    12        // moon centre row
 #define OCEAN_MOON_R     3        // moon disc radius
-#define OCEAN_T_MS  20000UL   // DEV: restore to 210000UL in Task 8      // full cycle length (~3.5 min)
+#define OCEAN_T_MS  210000UL      // full cycle length (~3.5 min)
 
 // sub-phase boundaries as a fraction of the cycle
 #define OCEAN_SR_END  0.18f       // end of sunrise
