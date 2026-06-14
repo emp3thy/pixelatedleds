@@ -371,7 +371,7 @@ void oceanSunrise(){
   // then ramp up fast; mirror on sunrise so they vanish as the sun lifts.
   ocean.nightVis = oceanSmooth((ocean.nf - 0.82f) / 0.18f);
   ocean.alt = oceanSunAlt(ocean.phase);
-  ocean.sunUp = ocean.phase < OCEAN_SS_END;     // sun shown sunrise..sunset
+  ocean.sunUp = ocean.alt > 0.0f;               // only when above/breaching the horizon — no night halo glow
   oceanSkyColors(ocean.phase, ocean.skyTop, ocean.skyHorizon);
   // rendered cloud coverage eases across the stage between prev/next targets
   ocean.cloudCov = oceanCloudPrev +

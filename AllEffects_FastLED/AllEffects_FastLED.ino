@@ -36,15 +36,18 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 // divides by 57). Drag it in the browser to cycle all patterns.
 fl::UISlider effectSlider("Pattern (0-20)", 0, 0, 1140, 57);
 
-// Flat-viewer pattern control: viewer.html calls sim_set_pattern() directly,
-// bypassing the wasm UI protocol. 0..1023 mirrors the analogRead range.
-// EMSCRIPTEN_KEEPALIVE forces the symbol to be kept and exported to JS
-// (the build's link step ignores EXPORTED_FUNCTIONS edits).
+// WASM-sim-only export stub. The FastLED wasm linker is configured to export
+// `sim_set_pattern`, so the symbol must exist for the sim to link; it's a
+// vestigial hook (the viewer drives effects via the UISlider/processUiInput, so
+// g_simPattern is intentionally unused). Guarded so the Teensy/AVR hardware
+// build — which has no <emscripten.h> — still compiles.
+#ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 extern "C" {
   int g_simPattern = 0;
   EMSCRIPTEN_KEEPALIVE void sim_set_pattern(int v) { g_simPattern = v; }
 }
+#endif
 
 // Adapter: the screenmap needs the XYFunction signature; forward to XY().
 static uint16_t simXYFunc(uint16_t x, uint16_t y, uint16_t, uint16_t) { return XY(x, y); }
