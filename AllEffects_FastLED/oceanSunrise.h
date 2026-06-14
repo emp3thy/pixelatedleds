@@ -34,7 +34,7 @@ static inline CRGB oceanLerpRGB(const CRGB&a,const CRGB&b,float t){
 // night -> dawn -> day -> sunset -> night. Night top is a *visible* navy.
 // Sunset boundary is 0.40..0.62. Hold "day" until 0.47 (~1/3 of the way down)
 // before warming, peak sunset near the horizon (0.585), then night by 0.66.
-static const float OCEAN_KF_PHASE[]   = {0.00f, 0.09f, 0.30f, 0.47f, 0.585f, 0.66f, 1.01f};
+static const float OCEAN_KF_PHASE[]   = {0.00f, 0.05f, 0.13f, 0.47f, 0.585f, 0.66f, 1.01f};
 static const CRGB  OCEAN_KF_TOP[]     = {CRGB(0x0A1430),CRGB(0x232A63),CRGB(0x2F7FD6),CRGB(0x2F7FD6),CRGB(0x2E2350),CRGB(0x0A1430),CRGB(0x0A1430)};
 static const CRGB  OCEAN_KF_HORIZON[] = {CRGB(0x122044),CRGB(0xFFD98C),CRGB(0xD8F0FF),CRGB(0xD8F0FF),CRGB(0xFFCE5A),CRGB(0x122044),CRGB(0x122044)};
 
@@ -148,8 +148,6 @@ static void oceanDrawMoon(){
   float a  = cosf(2.0f*3.14159f*ph);                          // +1 full .. -1 new (terminator scale)
   bool  waxing = ph > 0.5f;                                   // 0.5..1 grows back toward full
   CRGB col = oceanMoonColor();
-  CRGB skyHere = oceanLerpRGB(ocean.skyTop, ocean.skyHorizon,
-                              (float)OCEAN_MOON_Y/(float)(OCEAN_HORIZON-1));
   float R = OCEAN_MOON_R;
   for(int16_t y=OCEAN_MOON_Y-OCEAN_MOON_R-3; y<=OCEAN_MOON_Y+OCEAN_MOON_R+3; y++){
     if(y<0||y>=OCEAN_HORIZON) continue;
@@ -162,8 +160,9 @@ static void oceanDrawMoon(){
         float nx=dx/R, ny=dy/R;
         float tx = a * sqrtf(1.0f - ny*ny);                  // terminator x at this row
         bool lit = waxing ? (nx >= -tx) : (nx <= tx);        // lit side of the terminator
-        // edge gives a round anti-aliased rim; nightVis fades the whole moon in/out
-        leds[XY(x,y)] = oceanLerpRGB(leds[XY(x,y)], lit?col:skyHere, ocean.nightVis*edge);
+        // Only paint the LIT side; the dark side stays the real sky behind it
+        // (painting a flat sky colour left a patchy dark ring). edge = round AA.
+        if(lit) leds[XY(x,y)] = oceanLerpRGB(leds[XY(x,y)], col, ocean.nightVis*edge);
       } else if(d <= OCEAN_MOON_R+2.5f){                      // soft halo
         float h=(1.0f-(d-OCEAN_MOON_R)/2.5f)*0.4f*ocean.nightVis;
         if(h>0) leds[XY(x,y)] += CRGB((uint8_t)(col.r*h),(uint8_t)(col.g*h),(uint8_t)(col.b*h));
@@ -190,7 +189,7 @@ static void oceanDrawStars(){
   uint16_t t = millis();
   for(uint8_t i=0;i<OCEAN_NUM_STARS;i++){
     OceanStar &s = oceanStars[i];
-    uint8_t tw = sin8(s.ph + t/6);                // twinkle 0..255
+    uint8_t tw = sin8(s.ph*2 + t/3);              // twinkle 0..255 (faster)
     float a = ocean.nightVis * (0.35f + tw/400.0f); // opacity follows night-visibility
     if(a>1) a=1;
     leds[XY(s.x,s.y)] += CRGB((uint8_t)(200*a),(uint8_t)(210*a),(uint8_t)(235*a));
@@ -339,9 +338,9 @@ void oceanSunrise(){
   ocean.phase = (float)ms / (float)OCEAN_T_MS;
   oceanUpdateStageState(ocean.phase);
   ocean.nf  = oceanNightFactor(ocean.phase);
-  // moon/stars stay hidden until the sun is almost gone (nf>0.6), then ramp up
-  // fast; mirror on sunrise so they vanish quickly as the sun lifts.
-  ocean.nightVis = oceanSmooth((ocean.nf - 0.6f) / 0.4f);
+  // moon/stars hidden until the sun's lower edge reaches the water (nf~0.82),
+  // then ramp up fast; mirror on sunrise so they vanish as the sun lifts.
+  ocean.nightVis = oceanSmooth((ocean.nf - 0.82f) / 0.18f);
   ocean.alt = oceanSunAlt(ocean.phase);
   ocean.sunUp = ocean.phase < OCEAN_SS_END;     // sun shown sunrise..sunset
   oceanSkyColors(ocean.phase, ocean.skyTop, ocean.skyHorizon);
