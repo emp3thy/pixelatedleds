@@ -110,9 +110,54 @@ static void oceanUpdateStageState(float p){
 static void oceanDrawClouds()      {}
 static void oceanDrawStars()       {}
 static void oceanDrawMoon()        {}
-static void oceanDrawSun()         {}
 static void oceanDrawOcean()       {}
 static void oceanDrawReflections() {}
+
+// additive write into a sky pixel, clamped
+static inline void oceanAddPix(int16_t x,int16_t y,const CRGB&col,float a){
+  if(a<=0.0f) return; if(a>1.0f) a=1.0f;
+  if(x<0||x>=NUM_COLS||y<0||y>=OCEAN_HORIZON) return;
+  leds[XY(x,y)] += CRGB((uint8_t)(col.r*a),(uint8_t)(col.g*a),(uint8_t)(col.b*a));
+}
+
+// Sun colour by altitude: deep orange-red low -> white-gold high.
+static CRGB oceanSunColor(){
+  CRGB low(0xFF,0x5A,0x2A), high(0xFF,0xF4,0xD0);
+  return oceanLerpRGB(low, high, oceanSmooth(ocean.alt));
+}
+
+static void oceanDrawSun(){
+  if(!ocean.sunUp) return;
+  float sy = OCEAN_HORIZON - ocean.alt * (OCEAN_HORIZON - OCEAN_PEAK_Y); // disc centre row
+  float sx = OCEAN_SUN_X;
+  CRGB col = oceanSunColor();
+  float lowness = 1.0f - oceanSmooth(ocean.alt);     // 1 at horizon, 0 at peak
+  float haloR = OCEAN_SUN_R + 6.0f + lowness*8.0f;
+
+  // disc + radial halo (no per-pixel atan2)
+  for(int16_t y=0; y<OCEAN_HORIZON; y++){
+    for(int16_t x=0; x<NUM_COLS; x++){
+      float dx=x-sx, dy=y-sy, d=sqrtf(dx*dx+dy*dy);
+      if(d <= OCEAN_SUN_R){ leds[XY(x,y)] = col; continue; }   // solid disc
+      if(d < haloR){
+        oceanAddPix(x,y,col,(1.0f-(d-OCEAN_SUN_R)/(haloR-OCEAN_SUN_R))*0.7f);
+      }
+    }
+  }
+  // sunburst rays: 12 explicit tapered spokes, stronger when the sun is low
+  if(lowness > 0.05f){
+    const uint8_t nRays = 12;
+    float rayLen = (OCEAN_SUN_R + 4.0f) + lowness*14.0f;
+    for(uint8_t r=0;r<nRays;r++){
+      float ang = (2.0f*3.14159f*r)/nRays;
+      float ca=cosf(ang), sa=sinf(ang);
+      for(float dd=OCEAN_SUN_R; dd<rayLen; dd+=1.0f){
+        float a = (1.0f - dd/rayLen) * lowness * 0.6f;
+        oceanAddPix((int16_t)(sx+ca*dd+0.5f),(int16_t)(sy+sa*dd+0.5f),col,a);
+      }
+    }
+  }
+}
 
 // ---- sky layer: vertical gradient top->horizon over the sky rows ----
 static void oceanDrawSky(){
