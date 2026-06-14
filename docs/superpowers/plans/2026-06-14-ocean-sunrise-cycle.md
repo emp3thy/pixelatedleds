@@ -12,6 +12,24 @@
 
 ---
 
+## Memory Guardrails
+
+Retrieved from better-memory (`memory_retrieve` planning + implementation, `knowledge_list`) before drafting, per the planning standard. Confidence/evidence shown.
+
+- **`apply-confidence-scoring` — knowledge standard `ralph-runtime.md` (non-skippable gate).** Every task below carries a confidence %; any ≤90% embeds its mitigation **inside the task body**. Verify-before-commit: read the FastLED API / the existing in-repo effect that uses it before writing a dependent step.
+- **`writing-plans-surface-guardrails` — conf 0.90, useful 7.** Surface planning memories at the TOP of the plan (this section).
+- **`render-in-visualiser-+-assumptions` — knowledge standard.** Spec and plan are rendered in the visual companion; the spec carries an explicit Assumptions section. (Satisfied.)
+- **`feature-branch-at-task-start` — user pref.** **PRE-FLIGHT (do before Task 1):** the current branch `feat/vertical-led-frame` is mis-scoped (the vertical-frame design was abandoned for the flat 60×60 canvas) and carries uncommitted effect WIP. Commit that WIP, then start the ocean effect on a fresh, correctly-named branch (e.g. `feat/ocean-sunrise-effect`).
+- **`verify-before-commit-internal-patterns` — knowledge standard.** The `XY()`/`leds[]`/`FastLED.show()` render pattern, the slider→table wiring, and `inoise8`/`sin8`/`blend`/`nscale8_video`/`qadd8` usage were all read from the in-repo effects this session; the signatures used in this plan match them.
+- **`prioritise-root-cause` — conf 1.0, useful 15.** If a layer looks wrong, fix the cause (phase math, palette control point, mask geometry), not a surface patch.
+
+**Dismissed (considered, not applicable):**
+- *Keep website/README in sync (conf 0.95):* no project-level README/website effect list exists; effect names live only in `viewer.html` NAMES + `effectChanging.h` tables, which the plan already edits. No extra docs task.
+- *tempfile fd-leak (0.6), Playwright textContent (0.8), freeze enter/exit logging (0.55), fail-fast ordering (0.55):* Python/web-test specific — no such code here.
+- *Ralph-queue "don't propose execution" / PR-thread-resolve:* no queue dispatch or PR in this plan.
+
+---
+
 ## Conventions for every task
 
 - **Two copies:** edit `.sim/AllEffects_FastLED/oceanSunrise.h`, then `cp` it to `AllEffects_FastLED/oceanSunrise.h`. Same for any other file. Both must stay identical.
@@ -40,6 +58,8 @@
 ---
 
 ## Task 1: Scaffold — cycle state, sky gradient, wiring
+
+**Confidence: 95%** — wiring pattern (include + loop `case` + `effectChanging.h` tables + `viewer.html` NAMES/slider) was done four times this session. Slider math verified: 21 effects → max `20*57 = 1140`, clamp `20`, `idx = round(v/57)`. Risk is only mechanical (keep root + `.sim` copies identical — Step 5 diffs them).
 
 Gets a working effect on the slider that already cross-fades the sky through all four phases. Layer functions for the other elements are declared as stubs and filled in later tasks.
 
@@ -307,6 +327,8 @@ git commit -m "feat(effect): ocean cycle scaffold — sky gradient + wiring"
 
 ## Task 2: Sun — disc, halo, sunburst rays, motion, colour
 
+**Confidence: 92%** — `sqrtf`/`atan2f`/`cosf` are in `<math.h>` (already included in Task 1) and the FPU handles them on Teensy 4.0; per-pixel float math matches voronoi/aurora/kusama which already run 60–140 fps. Mitigation for the one soft spot (ray-spoke look is subjective): exact ray count/threshold/length are tuned in Task 8, and the loop only runs over sky rows while `sunUp`.
+
 **Files:**
 - Modify: `.sim/AllEffects_FastLED/oceanSunrise.h` then copy to root.
 
@@ -381,6 +403,8 @@ git commit -m "feat(effect): ocean cycle — sun disc, halo, rays, motion"
 
 ## Task 3: Ocean — base mirror, slow waves, foam
 
+**Confidence: 93%** — `sin8`, `nscale8_video`, `qadd8`/`qsub8`, `blur2d`-free; all used verbatim in existing effects (pacifica/metaBalls) this session. Risk: wave speed/foam rate are taste — tuned in Task 8.
+
 **Files:**
 - Modify: `.sim/AllEffects_FastLED/oceanSunrise.h` then copy to root.
 
@@ -434,6 +458,8 @@ git commit -m "feat(effect): ocean cycle — sea base, waves, foam"
 
 ## Task 4: Reflections — sun shimmer column on the water
 
+**Confidence: 93%** — additive `sin8`-driven column, no new APIs. `oceanSunColor()` is defined in Task 2 and reused here (type-consistent). Risk: column width/decay are taste — tuned in Task 8.
+
 **Files:**
 - Modify: `.sim/AllEffects_FastLED/oceanSunrise.h` then copy to root.
 
@@ -485,6 +511,8 @@ git commit -m "feat(effect): ocean cycle — sun reflection column"
 ---
 
 ## Task 5: Stars — fixed twinkling points, night-only
+
+**Confidence: 96%** — fixed table + `sin8` twinkle gated by `ocean.nf`; same idiom as the kusama/aurora star sparkles. Lowest-risk task.
 
 **Files:**
 - Modify: `.sim/AllEffects_FastLED/oceanSunrise.h` then copy to root.
@@ -539,6 +567,8 @@ git commit -m "feat(effect): ocean cycle — twinkling night stars"
 ---
 
 ## Task 6: Moon — disc, lunar phase, halo, reflection
+
+**Confidence: 88% → 92% with embedded mitigation.** The render APIs are safe; the uncertain part is the **terminator (lit-limb) geometry** — the `masked == (off>=0)` carve could illuminate the wrong limb. Mitigation is embedded as a mandatory three-phase verification in Step 4 with an explicit one-line fallback (flip the boolean) — this turns a visual unknown into a checked, correctable step rather than a deferred risk.
 
 **Files:**
 - Modify: `.sim/AllEffects_FastLED/oceanSunrise.h` then copy to root.
@@ -595,9 +625,23 @@ Append inside `oceanDrawReflections()` after the sun block:
 
 - [ ] **Step 3: Copy to root, build.**
 
-- [ ] **Step 4: Verify**
+- [ ] **Step 4: Verify the lit limb at three phases (mitigation gate)**
 
-Reload viewer (watch fast). Confirm: at night a pale moon sits high on the right with a soft halo and a dim white reflection column on the sea. Temporarily set `oceanDayCount` to different values (e.g. add `oceanDayCount=7;` before the moon draw) to confirm the lit limb changes (full vs crescent); remove the override before committing.
+This is the confidence-lift step for the terminator geometry. Temporarily force the phase by adding one of these lines at the very top of `oceanDrawMoon()`, rebuild, and check the disc:
+
+| Force | `moonPhase` | Expected disc |
+|-------|-------------|---------------|
+| `oceanDayCount = 0;`  | 0.00 | **full** (whole disc lit) |
+| `oceanDayCount = 7;`  | ~0.23 | **gibbous/half**, lit on one side |
+| `oceanDayCount = 15;` | 0.50 | **new** (disc all sky-colour / dark) |
+
+If at `oceanDayCount=7` the **wrong** limb is lit (the dark bite is on the side that should be lit), apply the one-line fallback — flip the carve condition in `oceanDrawMoon`:
+
+```cpp
+        if(masked != (off>=0)) {   // was: masked == (off>=0)
+```
+
+Re-check the table. Also confirm the moon sits high on the right with a soft halo and a dim white reflection column on the sea. **Remove the `oceanDayCount = …;` override before committing.**
 
 - [ ] **Step 5: Commit**
 
@@ -609,6 +653,8 @@ git commit -m "feat(effect): ocean cycle — moon with lunar phase + reflection"
 ---
 
 ## Task 7: Clouds — stage-stepped coverage, noise patches, tint, drift
+
+**Confidence: 90%** — `inoise8` drift + threshold is the exact idiom used in voronoi/aurora/waterLilies this session. The coverage walk math (`oceanUpdateStageState`) was authored in Task 1 and is unit-inspectable. Mitigation for the coverage→threshold curve (visual): Step 3 forces `cloudCov≈25` via a temporary override to confirm tint/drift/sky-only confinement directly, before trusting the slow walk.
 
 **Files:**
 - Modify: `.sim/AllEffects_FastLED/oceanSunrise.h` then copy to root.
@@ -659,6 +705,8 @@ git commit -m "feat(effect): ocean cycle — drifting tinted clouds"
 ---
 
 ## Task 8: Integration tuning pass
+
+**Confidence: 95%** — no new structure, only adjusting the named tunables surfaced by the spec's "Open Tunables". Each tweak is rebuilt and re-verified visually before the next.
 
 **Files:**
 - Modify: `.sim/AllEffects_FastLED/oceanSunrise.h` then copy to root.
