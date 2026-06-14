@@ -315,7 +315,12 @@ static CRGB oceanSunColor(){
 
 static void oceanDrawSun(){
   if(!ocean.sunUp) return;
-  float sy = OCEAN_HORIZON - ocean.alt * (OCEAN_HORIZON - OCEAN_PEAK_Y); // disc centre row
+  // At alt 0 the disc centre sits fully below the waterline (whole disc hidden);
+  // rising altitude lifts it up through the horizon so it edges in/out instead
+  // of popping as a half-circle. The ocean layer (drawn after) clips the part
+  // still below the waterline.
+  float syLow = OCEAN_HORIZON + OCEAN_SUN_R + 2.0f;                    // fully submerged
+  float sy = syLow - ocean.alt * (syLow - OCEAN_PEAK_Y);              // disc centre row
   float sx = OCEAN_SUN_X;
   CRGB col = oceanSunColor();
   float lowness = 1.0f - oceanSmooth(ocean.alt);     // 1 at horizon, 0 at peak
