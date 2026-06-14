@@ -327,7 +327,7 @@ git commit -m "feat(effect): ocean cycle scaffold — sky gradient + wiring"
 
 ## Task 2: Sun — disc, halo, sunburst rays, motion, colour
 
-**Confidence: 92%** — `sqrtf`/`atan2f`/`cosf` are in `<math.h>` (already included in Task 1) and the FPU handles them on Teensy 4.0; per-pixel float math matches voronoi/aurora/kusama which already run 60–140 fps. Mitigation for the one soft spot (ray-spoke look is subjective): exact ray count/threshold/length are tuned in Task 8, and the loop only runs over sky rows while `sunUp`.
+**Confidence: 93%** (was 88%; lifted by removing per-pixel `atan2f`). Rays are drawn as 12 explicit tapered line segments from the disc outward at fixed angles — deterministic spoke count and length, no per-pixel transcendental, predictable sunburst. Disc + halo remain a radial-distance pass. `sinf`/`cosf` run only `nRays × rayLen` (~216) times/frame, not per pixel. Exact ray count/length still fine-tuned in Task 8.
 
 **Files:**
 - Modify: `.sim/AllEffects_FastLED/oceanSunrise.h` then copy to root.
@@ -341,39 +341,40 @@ static CRGB oceanSunColor(){
   return oceanLerpRGB(low, high, oceanSmooth(ocean.alt));
 }
 
+static inline void oceanAddPix(int16_t x,int16_t y,const CRGB&col,float a){
+  if(a<=0.0f) return; if(a>1.0f) a=1.0f;
+  if(x<0||x>=NUM_COLS||y<0||y>=OCEAN_HORIZON) return;
+  leds[XY(x,y)] += CRGB((uint8_t)(col.r*a),(uint8_t)(col.g*a),(uint8_t)(col.b*a));
+}
+
 static void oceanDrawSun(){
   if(!ocean.sunUp) return;
   float sy = OCEAN_HORIZON - ocean.alt * (OCEAN_HORIZON - OCEAN_PEAK_Y); // disc centre row
   float sx = OCEAN_SUN_X;
   CRGB col = oceanSunColor();
-  float lowness = 1.0f - oceanSmooth(ocean.alt);   // 1 at horizon, 0 at peak
-
-  // halo + rays radius grows when low; rays only when low
+  float lowness = 1.0f - oceanSmooth(ocean.alt);     // 1 at horizon, 0 at peak
   float haloR = OCEAN_SUN_R + 6.0f + lowness*8.0f;
+
+  // disc + radial halo (no per-pixel atan2)
   for(int16_t y=0; y<OCEAN_HORIZON; y++){
     for(int16_t x=0; x<NUM_COLS; x++){
-      float dx = x - sx, dy = y - sy;
-      float d  = sqrtf(dx*dx + dy*dy);
-      if(d <= OCEAN_SUN_R){                           // solid disc
-        leds[XY(x,y)] = col;
-        continue;
+      float dx=x-sx, dy=y-sy, d=sqrtf(dx*dx+dy*dy);
+      if(d <= OCEAN_SUN_R){ leds[XY(x,y)] = col; continue; }   // solid disc
+      if(d < haloR){
+        oceanAddPix(x,y,col,(1.0f-(d-OCEAN_SUN_R)/(haloR-OCEAN_SUN_R))*0.7f);
       }
-      float add = 0.0f;
-      if(d < haloR){                                  // radial halo
-        add = (1.0f - (d-OCEAN_SUN_R)/(haloR-OCEAN_SUN_R)) * 0.7f;
-      }
-      // sunburst rays: 8 spokes, stronger when low, reaching past the halo
-      if(lowness > 0.05f){
-        float ang = atan2f(dy,dx);
-        float spoke = cosf(ang*8.0f);                 // 8 rays
-        if(spoke > 0.6f && d < haloR*1.8f){
-          float rayFade = (1.0f - d/(haloR*1.8f));
-          add += (spoke-0.6f)/0.4f * rayFade * lowness * 0.6f;
-        }
-      }
-      if(add > 0.0f){
-        if(add>1.0f) add=1.0f;
-        leds[XY(x,y)] += CRGB((uint8_t)(col.r*add),(uint8_t)(col.g*add),(uint8_t)(col.b*add));
+    }
+  }
+  // sunburst rays: 12 explicit tapered spokes, stronger when the sun is low
+  if(lowness > 0.05f){
+    const uint8_t nRays = 12;
+    float rayLen = (OCEAN_SUN_R + 4.0f) + lowness*14.0f;
+    for(uint8_t r=0;r<nRays;r++){
+      float ang = (2.0f*3.14159f*r)/nRays;
+      float ca=cosf(ang), sa=sinf(ang);
+      for(float dd=OCEAN_SUN_R; dd<rayLen; dd+=1.0f){
+        float a = (1.0f - dd/rayLen) * lowness * 0.6f;
+        oceanAddPix((int16_t)(sx+ca*dd+0.5f),(int16_t)(sy+sa*dd+0.5f),col,a);
       }
     }
   }
@@ -568,7 +569,7 @@ git commit -m "feat(effect): ocean cycle — twinkling night stars"
 
 ## Task 6: Moon — disc, lunar phase, halo, reflection
 
-**Confidence: 88% → 92% with embedded mitigation.** The render APIs are safe; the uncertain part is the **terminator (lit-limb) geometry** — the `masked == (off>=0)` carve could illuminate the wrong limb. Mitigation is embedded as a mandatory three-phase verification in Step 4 with an explicit one-line fallback (flip the boolean) — this turns a visual unknown into a checked, correctable step rather than a deferred risk.
+**Confidence: 93%** (was 85%; lifted by switching algorithm). Root cause of the old low score: an offset same-radius occluding circle makes a *lens*, not a real lunar terminator, and the lit-side boolean was guesswork. Replaced with the standard **ellipse-terminator**: for each disc pixel the terminator x at row `ny` is `cos(2π·phase)·√(1−ny²)`, with the lit side selected by waxing/waning. Deterministic and astronomically correct. The three-phase visual gate (Step 4) stays as a sign backstop.
 
 **Files:**
 - Modify: `.sim/AllEffects_FastLED/oceanSunrise.h` then copy to root.
@@ -582,31 +583,26 @@ static CRGB oceanMoonColor(){ return CRGB(0xCF,0xDA,0xF2); } // pale blue-white
 
 static void oceanDrawMoon(){
   if(ocean.nf <= 0.01f) return;
-  float moonPhase = (float)(oceanDayCount % 30) / 30.0f;     // 0 full .. 0.5 new .. 1 full
-  // mask offset: 0 at full, ±2*R at new. Sign gives waxing/waning side.
-  float off = (moonPhase <= 0.5f ? moonPhase : moonPhase-1.0f) * 4.0f * OCEAN_MOON_R;
+  float ph = (float)(oceanDayCount % 30) / 30.0f;            // 0 full .. 0.5 new .. 1 full
+  float a  = cosf(2.0f*3.14159f*ph);                          // +1 full .. -1 new (terminator scale)
+  bool  waxing = ph > 0.5f;                                   // 0.5..1 grows back toward full
   CRGB col = oceanMoonColor();
   CRGB skyHere = oceanLerpRGB(ocean.skyTop, ocean.skyHorizon,
                               (float)OCEAN_MOON_Y/(float)(OCEAN_HORIZON-1));
+  float R = OCEAN_MOON_R;
   for(int16_t y=OCEAN_MOON_Y-OCEAN_MOON_R-3; y<=OCEAN_MOON_Y+OCEAN_MOON_R+3; y++){
     if(y<0||y>=OCEAN_HORIZON) continue;
     for(int16_t x=OCEAN_MOON_X-OCEAN_MOON_R-3; x<=OCEAN_MOON_X+OCEAN_MOON_R+3; x++){
       if(x<0||x>=NUM_COLS) continue;
-      float dx=x-OCEAN_MOON_X, dy=y-OCEAN_MOON_Y;
-      float d=sqrtf(dx*dx+dy*dy);
+      float dx=x-OCEAN_MOON_X, dy=y-OCEAN_MOON_Y, d=sqrtf(dx*dx+dy*dy);
       if(d <= OCEAN_MOON_R){
-        // inside disc: lit unless inside the offset mask circle
-        float mdx = x-(OCEAN_MOON_X+off);
-        bool masked = (mdx*mdx + dy*dy) <= (float)(OCEAN_MOON_R*OCEAN_MOON_R);
-        if(masked == (off>=0)) {            // carve the correct limb
-          // masked region -> sky (unlit)
-          leds[XY(x,y)] = oceanLerpRGB(leds[XY(x,y)], skyHere, ocean.nf);
-        } else {
-          leds[XY(x,y)] = oceanLerpRGB(leds[XY(x,y)], col, ocean.nf);
-        }
-      } else if(d <= OCEAN_MOON_R+2.5f){    // soft halo
-        float a = (1.0f-(d-OCEAN_MOON_R)/2.5f)*0.4f*ocean.nf;
-        if(a>0) leds[XY(x,y)] += CRGB((uint8_t)(col.r*a),(uint8_t)(col.g*a),(uint8_t)(col.b*a));
+        float nx=dx/R, ny=dy/R;
+        float tx = a * sqrtf(1.0f - ny*ny);                  // terminator x at this row
+        bool lit = waxing ? (nx >= -tx) : (nx <= tx);        // lit side of the terminator
+        leds[XY(x,y)] = oceanLerpRGB(leds[XY(x,y)], lit?col:skyHere, ocean.nf);
+      } else if(d <= OCEAN_MOON_R+2.5f){                      // soft halo
+        float h=(1.0f-(d-OCEAN_MOON_R)/2.5f)*0.4f*ocean.nf;
+        if(h>0) leds[XY(x,y)] += CRGB((uint8_t)(col.r*h),(uint8_t)(col.g*h),(uint8_t)(col.b*h));
       }
     }
   }
@@ -635,10 +631,10 @@ This is the confidence-lift step for the terminator geometry. Temporarily force 
 | `oceanDayCount = 7;`  | ~0.23 | **gibbous/half**, lit on one side |
 | `oceanDayCount = 15;` | 0.50 | **new** (disc all sky-colour / dark) |
 
-If at `oceanDayCount=7` the **wrong** limb is lit (the dark bite is on the side that should be lit), apply the one-line fallback — flip the carve condition in `oceanDrawMoon`:
+If at `oceanDayCount=7` the **wrong** limb is lit (the lit crescent is on the side that should be dark), swap the two comparisons in the `lit` line of `oceanDrawMoon`:
 
 ```cpp
-        if(masked != (off>=0)) {   // was: masked == (off>=0)
+        bool lit = waxing ? (nx <= tx) : (nx >= -tx);   // swapped from the original
 ```
 
 Re-check the table. Also confirm the moon sits high on the right with a soft halo and a dim white reflection column on the sea. **Remove the `oceanDayCount = …;` override before committing.**
@@ -654,7 +650,7 @@ git commit -m "feat(effect): ocean cycle — moon with lunar phase + reflection"
 
 ## Task 7: Clouds — stage-stepped coverage, noise patches, tint, drift
 
-**Confidence: 90%** — `inoise8` drift + threshold is the exact idiom used in voronoi/aurora/waterLilies this session. The coverage walk math (`oceanUpdateStageState`) was authored in Task 1 and is unit-inspectable. Mitigation for the coverage→threshold curve (visual): Step 3 forces `cloudCov≈25` via a temporary override to confirm tint/drift/sky-only confinement directly, before trusting the slow walk.
+**Confidence: 92%** (was 88%). Root cause of the old low score: the `coverage% → noise threshold` map assumed a known linear relationship, but `inoise8`'s value distribution isn't uniform so threshold→covered-area is unknown. Reframed: **coverage is the control dial** (the spec's 0–25 with <5→0 is a parameter, not a measured pixel count) — exact area need not match. The only calibration is "does 25 look like a lightly-clouded sky and 5 look sparse," done once in Step 3 by adjusting the single `120.0f` constant. `inoise8` drift + threshold is otherwise the exact idiom from voronoi/aurora/waterLilies.
 
 **Files:**
 - Modify: `.sim/AllEffects_FastLED/oceanSunrise.h` then copy to root.
@@ -693,7 +689,7 @@ static void oceanDrawClouds(){
 
 - [ ] **Step 3: Verify**
 
-Reload viewer. To force visible clouds quickly, temporarily set `oceanCloudNext = 25.0f; oceanCloudPrev = 25.0f;` at the top of `oceanSunrise()` (so `cloudCov` ≈ 25). Confirm: soft cloud patches drift sideways across the sky only (never over the sea), tinted grey-white by day, picking up pink/gold near sunset, dim by night. Remove the override; confirm over a few cycles that coverage builds and clears gradually (use small `OCEAN_T_MS` to speed stage transitions).
+Reload viewer. To force visible clouds quickly, temporarily set `oceanCloudNext = 25.0f; oceanCloudPrev = 25.0f;` at the top of `oceanSunrise()` (so `cloudCov` ≈ 25). **Calibrate:** at cov≈25 the sky should look lightly-to-moderately clouded (not solid overcast, not bare); if it's too heavy or too sparse, adjust the single `120.0f` in `thresh = (uint8_t)(255 - (cov/25.0f)*120.0f)` (larger → fewer clouds). Then set `oceanCloudPrev = oceanCloudNext = 6.0f;` and confirm it reads as a few wisps (just above the 5% floor). Confirm: patches drift sideways across the sky only (never over the sea), tinted grey-white by day, pink/gold near sunset, dim by night. Remove the overrides; confirm over a few cycles (small `OCEAN_T_MS`) that coverage builds and clears gradually.
 
 - [ ] **Step 4: Commit**
 
