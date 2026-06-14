@@ -276,6 +276,9 @@ static void oceanDrawOcean(){
   CRGB base = ocean.skyHorizon;
   uint8_t baseScale = 130 + (uint8_t)((1.0f - ocean.nf) * 95.0f);  // night 130 .. day ~225
   base.nscale8_video(baseScale);
+  // Push toward a rich inviting blue during the day (the pale horizon mirror
+  // read grey); weighted by daytime so sunset/night keep their reflected warmth.
+  base = oceanLerpRGB(base, CRGB(0x1E,0x74,0xC8), (1.0f - ocean.nf) * 0.55f);
   for(uint8_t y=OCEAN_HORIZON; y<NUM_ROWS; y++){
     // depth 0 at horizon -> 1 at bottom; deeper = a touch darker
     float depth = (float)(y-OCEAN_HORIZON)/(float)(NUM_ROWS-1-OCEAN_HORIZON);
