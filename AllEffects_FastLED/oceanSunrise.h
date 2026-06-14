@@ -113,20 +113,28 @@ static void oceanDrawClouds(){
   float cov = ocean.cloudCov;
   if(cov < 5.0f) return;                          // <5% reads as clear
   if(cov > 25.0f) cov = 25.0f;
-  // higher coverage -> lower threshold -> more cloud pixels
-  uint8_t thresh = (uint8_t)(255 - (cov/25.0f)*120.0f);   // 255(min) .. 135(max)
-  uint16_t t = millis();
+  uint32_t tms = millis();
+  uint16_t t = (uint16_t)tms;
+  // Deterministic cloud BANK: a drifting horizontal stretch whose half-width
+  // grows with coverage. Low % -> a small clump in one place; high % -> a wide
+  // band. Guarantees clouds appear (doesn't depend on noise hitting a peak).
+  float bankCx = NUM_COLS*0.5f + (NUM_COLS*0.40f) * sinf(tms/9000.0f);  // slow drift
+  float hw     = 5.0f + (cov/25.0f) * 40.0f;     // half-width: ~5 (clump) .. ~45 (band)
   // cloud tint: white by day, warmed toward horizon colour, dimmed at night
   CRGB warm = ocean.skyHorizon;
   CRGB tint = oceanLerpRGB(CRGB(235,238,245), warm, 0.45f);
   tint = oceanLerpRGB(tint, CRGB(60,66,86), ocean.nf*0.7f);
   for(uint8_t y=0; y<OCEAN_HORIZON-4; y++){       // sky only, leave a clear strip at horizon
     for(uint8_t x=0;x<NUM_COLS;x++){
-      uint8_t n = inoise8(x*28 + t/20, y*28);     // drifting sideways
-      if(n <= thresh) continue;
-      float a = (n-thresh)/(float)(255-thresh);   // soft cloud edge
-      // fade clouds out near the top and the horizon strip
-      a *= 1.0f - fabsf((float)y/(OCEAN_HORIZON-4) - 0.5f)*0.6f;
+      float dxb = fabsf((float)x - bankCx);
+      if(dxb > hw) continue;                       // outside the bank -> clear sky
+      float edgeFade = 1.0f - dxb/hw;              // 1 centre .. 0 bank edge
+      // Anisotropic streak texture: wide in x, short in y -> horizontal wisps.
+      uint8_t n = inoise8(x*13 + t/20, y*58);
+      if(n <= 150) continue;                        // patchy density within the bank
+      float a = ((n-150)/105.0f) * (0.35f + edgeFade*0.65f);
+      // keep clouds in a horizontal mid-sky band; fade toward top + horizon strip
+      a *= 1.0f - fabsf((float)y/(OCEAN_HORIZON-4) - 0.45f)*1.1f;
       if(a<=0) continue; if(a>1) a=1;
       leds[XY(x,y)] = oceanLerpRGB(leds[XY(x,y)], tint, a);
     }
@@ -198,7 +206,7 @@ static void oceanReflect(uint8_t cx, CRGB col, float strength){
   for(uint8_t y=OCEAN_HORIZON; y<NUM_ROWS; y++){
     float depth = (float)(y-OCEAN_HORIZON)/(float)(NUM_ROWS-OCEAN_HORIZON);
     float fade  = (1.0f - depth) * strength;                 // fades downward
-    uint8_t wob = sin8(y*30 + t/16);                         // vertical wobble (slow)
+    uint8_t wob = sin8(y*30 + t/26);                         // vertical wobble (slow)
     float width = 1.5f + depth*3.0f;                         // widens with depth
     for(int16_t x=cx-(int16_t)width; x<=cx+(int16_t)width; x++){
       if(x<0||x>=NUM_COLS) continue;
@@ -223,7 +231,7 @@ static void oceanDrawReflections(){
       for(int16_t yy=OCEAN_HORIZON-1; yy<=OCEAN_HORIZON+3 && yy<NUM_ROWS; yy++){
         if(yy<0) continue;
         float vrow = (yy<=OCEAN_HORIZON) ? 1.0f : (1.0f-(yy-OCEAN_HORIZON)/3.5f);
-        uint8_t shimmer = sin8(yy*40 + tt/16);               // gentle wobble on the water
+        uint8_t shimmer = sin8(yy*40 + tt/26);               // gentle wobble on the water
         for(int16_t x=0;x<NUM_COLS;x++){
           float dxr = fabsf((float)x-OCEAN_SUN_X)/(float)NUM_COLS;
           float a = beam * (1.0f-dxr) * vrow * (0.45f + shimmer/600.0f);
@@ -240,6 +248,9 @@ static void oceanDrawReflections(){
 
 static void oceanDrawOcean(){
   uint16_t t = millis();
+  // Waves pulse: the scroll phase surges and eases (~16s period) instead of a
+  // constant crawl. Base rate kept forward-only so it never reverses.
+  uint16_t wsurge = (uint16_t)(t/26 + 28.0f*sinf(t/2400.0f));
   // base sea colour: a mirror of the horizon sky. Brightness tracks day/night so
   // the day sea is a clear lit blue (not near-black); darkened only at night.
   CRGB base = ocean.skyHorizon;
@@ -250,7 +261,7 @@ static void oceanDrawOcean(){
     float depth = (float)(y-OCEAN_HORIZON)/(float)(NUM_ROWS-1-OCEAN_HORIZON);
     for(uint8_t x=0;x<NUM_COLS;x++){
       // slow horizontal wave bands
-      uint8_t w = sin8(x*6 + y*10 + t/20);       // 0..255 (slow waves)
+      uint8_t w = sin8(x*6 + y*10 + wsurge);     // pulsing wave bands
       CRGB c = base;
       c.nscale8_video(235 - (uint8_t)(depth*30));
       // wave brightness ripple +/-
@@ -262,7 +273,7 @@ static void oceanDrawOcean(){
       // Coherent foam: on the brightest part of a wave crest, gated by a slowly
       // drifting noise field so it forms moving patches (not per-frame flicker).
       if(w > 236){
-        uint8_t fn = inoise8(x*22 + t/12, y*40);
+        uint8_t fn = inoise8(x*22 + t/20, y*40);
         if(fn > 150){
           uint8_t f = (uint8_t)((w-236) * 3);    // crest height -> foam strength
           leds[XY(x,y)] += CRGB(f, f, f);
