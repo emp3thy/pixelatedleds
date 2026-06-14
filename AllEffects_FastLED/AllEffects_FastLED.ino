@@ -27,13 +27,14 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 #include "voronoi.h"
 #include "waterLilies.h"
 #include "kusamaDots.h"
+#include "oceanSunrise.h"
 //end patterns
 
 // --- WASM-sim-only additions (not part of the Teensy/FastLED-3.3.3 build) ---
 // On-screen slider replaces the hardware potentiometer. 0..1023 mirrors the
 // analogRead() range; step 57 = one notch per pattern (convertToSelectedEffect
 // divides by 57). Drag it in the browser to cycle all patterns.
-fl::UISlider effectSlider("Pattern (0-19)", 0, 0, 1083, 57);
+fl::UISlider effectSlider("Pattern (0-20)", 0, 0, 1140, 57);
 
 // Flat-viewer pattern control: viewer.html calls sim_set_pattern() directly,
 // bypassing the wasm UI protocol. 0..1023 mirrors the analogRead range.
@@ -86,6 +87,9 @@ void loop()
       break;
     case 24:
       kusamaDots();
+      break;
+    case 25:
+      oceanSunrise();
       break;
     default:
       break;

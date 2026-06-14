@@ -27,8 +27,8 @@
     <div class="panel">
       <div class="ctl">
         <label>Pattern <span class="name" id="patName">0</span></label>
-        <input type="range" id="pattern" min="0" max="1083" step="57" value="0">
-        <div class="row"><span>0</span><span id="patVal">0</span><span>19</span></div>
+        <input type="range" id="pattern" min="0" max="1140" step="57" value="0">
+        <div class="row"><span>0</span><span id="patVal">0</span><span>20</span></div>
       </div>
       <div class="ctl">
         <label>Brightness gain <span id="gainVal">3.0×</span></label>
@@ -52,7 +52,7 @@
   const NAMES = ['pride','pacifica','metaBalls','fire','juggle','sinelon','rainbow','justWhite',
                  'palette fade','rain','confetti','bpm','rainbow+glitter',
                  'mondrian','plasma','aurora','voronoi',
-                 'water lilies','kusama dots','jusBlack (off)'];
+                 'water lilies','kusama dots','ocean sunrise','jusBlack (off)'];
 
   // --- UI manifest capture (C++ pushes component list here) ---
   let sliderId = null;
@@ -94,7 +94,7 @@
   const getStripPixelData= Module.cwrap('getStripPixelData', 'number', ['number','number']);
   const getScreenMapData = Module.cwrap('getScreenMapData', 'number', ['number']);
   const processUiInput   = Module.cwrap('processUiInput', null, ['string']);
-  const SLIDER_NAME      = 'Pattern (0-19)';   // UISlider name; UI manager matches by name
+  const SLIDER_NAME      = 'Pattern (0-20)';   // UISlider name; UI manager matches by name
 
   const readJson = (getter) => {
     const sizePtr = Module._malloc(4);
@@ -136,7 +136,7 @@
   const gainValEl = document.getElementById('gainVal'), cellValEl = document.getElementById('cellVal');
   const fpsEl = document.getElementById('fps');
   let pendingUi = null, gain = 3, cell = 10;
-  const idx = v => Math.min(19, Math.round(v / 57));
+  const idx = v => Math.min(20, Math.round(v / 57));
   function onPattern() {
     const v = +patEl.value;
     patVal.textContent = v; patName.textContent = idx(v) + ' · ' + NAMES[idx(v)];
