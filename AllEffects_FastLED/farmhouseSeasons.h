@@ -62,10 +62,6 @@ static void fhGlow(float cx,float cy,float r,CRGB c,float maxA){
     fhPlot(x,y,c,a);
   }
 }
-static void fhLine(int x0,int y0,int x1,int y1,CRGB c){
-  int dx=abs(x1-x0),dy=-abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1,e=dx+dy;
-  for(;;){ fhPlot(x0,y0,c,1.0f); if(x0==x1&&y0==y1) break; int e2=2*e; if(e2>=dy){e+=dy;x0+=sx;} if(e2<=dx){e+=dx;y0+=sy;} }
-}
 
 static inline float fhGround(float x){
   return 24.0f + 1.8f*sinf(x*0.45f) + 1.3f*sinf(x*0.17f+2.0f);
@@ -289,10 +285,11 @@ static void fhDrawHeroTree(float p){
     fhDisc(CL[i][0],CL[i][1],CL[i][2]*amt+0.3f,c);
   }
   if(p<FH_SPRING){
-    float bl=fhSmooth(1.0f-(p/FH_SPRING));
-    if(bl>0.05f){
-      fhDisc(11,35,1.2f,fhMix(CRGB(0xF2B6C6),CRGB(0xFFFFFF),0.3f));
-      fhDisc(14,36,1.0f,CRGB(0xF2B6C6));
+    float bl=fhSmooth(1.0f-(p/FH_SPRING));            // fade blossom in/out over early spring
+    if(bl>0.02f){
+      CRGB bc=fhMix(CRGB(0xF2B6C6),CRGB(0xFFFFFF),0.3f);
+      fhPlot(11,35,bc,bl); fhPlot(12,34,CRGB(0xF2B6C6),bl*0.85f);
+      fhPlot(14,36,CRGB(0xF2B6C6),bl); fhPlot(10,34,bc,bl*0.7f);
     }
   }
 }
