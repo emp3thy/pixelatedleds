@@ -12,7 +12,7 @@ byte convertToSelectedEffect(int resistence)
   // voronoi=22, waterLilies=23, kusamaDots=24.
   static const byte listOfPatternsForRectangularMatrix[] = {0, 1, 2, 3, 14, 15, 6, 7, 17, 9, 16, 11, 12, 19, 20, 21, 22, 23, 24, 25, 26, 13};
   static const byte listOfPatternsForSquareMatrix[]      = {0, 1, 2, 3, 14, 15, 6, 7, 17, 9, 16, 11, 12, 19, 20, 21, 22, 23, 24, 25, 26, 13};
-  static const byte listOfPatternsForSimpleLedStrip[]    = {0, 1, 6, 7,  8, 10, 12,14, 15,16, 17, 18,  0, 13,  0,  0,  0,  0,  0,  0,  0};
+  static const byte listOfPatternsForSimpleLedStrip[]    = {0, 1, 6, 7,  8, 10, 12,14, 15,16, 17, 18,  0, 13,  0,  0,  0,  0,  0,  0,  0,  0};
   int difference = resistence - lastSetResistence;
   byte result = resistence / 57;
   if (result > 21)
