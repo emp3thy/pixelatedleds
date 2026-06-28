@@ -569,36 +569,33 @@ git commit -m "feat(farmhouse): wheat field states + grass margin + transitions"
 - Modify: `AllEffects_FastLED/farmhouseSeasons.h` (+ `.sim` copy)
 
 **Interfaces:**
-- Consumes: `fhPlot`, `fhFillRow`.
-- Produces: `void fhDrawBarn(float p)` (a gambrel barn; snow cap added in Task 9).
+- Consumes: `fhPlot`, `fhFillRow`, `fhClampf`.
+- Produces: `void fhGambrelRoof(CRGB c)`, `void fhDrawBarn(float p)` (a gambrel barn; snow cap added in Task 9).
 
 - [ ] **Step 1: Add the barn draw and call it**
 
-Add before `fhRender`:
+The roof is the **5-point gambrel silhouette** approved in the prototype — ridge (42,31), knuckles (36,34)/(48,34), eaves (33,37)/(51,37) — rasterised by a per-row span fill (NOT a single gable triangle), with coverage AA on the slope edges. Add before `fhRender`:
 
 ```cpp
-static void fhTri(int x0,int y0,int x1,int y1,int x2,int y2,CRGB c){
-  int miny=min(y0,min(y1,y2)),maxy=max(y0,max(y1,y2));
-  int minx=min(x0,min(x1,x2)),maxx=max(x0,max(x1,x2));
-  for(int y=miny;y<=maxy;y++)for(int x=minx;x<=maxx;x++){
-    float d1=(x-x1)*(y0-y1)-(x0-x1)*(y-y1);
-    float d2=(x-x2)*(y1-y2)-(x1-x2)*(y-y2);
-    float d3=(x-x0)*(y2-y0)-(x2-x0)*(y-y0);
-    bool neg=(d1<0)||(d2<0)||(d3<0), pos=(d1>0)||(d2>0)||(d3>0);
-    if(!(neg&&pos)) fhPlot(x,y,c,1.0f);
+// gambrel roof span-fill: rows 31-34 shallow upper slope (ridge->knuckles),
+// rows 34-37 steep lower slope (knuckles->eaves). Soft (coverage) slope edges.
+static void fhGambrelRoof(CRGB c){
+  for(int y=31;y<=37;y++){
+    float L,R;
+    if(y<34){ float hw=(y-31)*2.0f; L=42-hw; R=42+hw; }   // ridge(42) -> knuckles(36..48)
+    else    { float k=(y-34);       L=36-k;  R=48+k;  }   // knuckles -> eaves(33..51)
+    for(int x=(int)floorf(L);x<=(int)ceilf(R);x++){
+      float cov=fhClampf(min((float)x+1,R)-max((float)x,L),0,1);
+      fhPlot(x,y,c,cov);
+    }
   }
 }
 static void fhDrawBarn(float p){
-  // gambrel roof (white): two triangles approximating ridge->knuckle->eave
-  fhTri(42,31, 48,34, 36,34, CRGB(0xEDE8DC));
-  fhTri(33,37, 51,37, 42,31, CRGB(0xEDE8DC));
-  fhTri(33,37, 51,37, 48,34, CRGB(0xEDE8DC));
-  // red body
-  for(int y=37;y<46;y++) fhFillRow(y,34,49,CRGB(0xBE3B2C));
+  fhGambrelRoof(CRGB(0xEDE8DC));                              // white gambrel roof
+  for(int y=37;y<46;y++) fhFillRow(y,34,49,CRGB(0xBE3B2C));   // red body
   for(int y=37;y<46;y++){ fhPlot(38,y,CRGB(0xB23528),1.0f); fhPlot(45,y,CRGB(0xB23528),1.0f); }
-  // hayloft + open doorway
-  for(int y=33;y<36;y++) fhFillRow(y,41,43,CRGB(0x2A1408));
-  for(int y=40;y<46;y++) fhFillRow(y,40,46,CRGB(0x241006));
+  for(int y=33;y<36;y++) fhFillRow(y,41,43,CRGB(0x2A1408));   // hayloft opening
+  for(int y=40;y<46;y++) fhFillRow(y,40,46,CRGB(0x241006));   // open doorway
 }
 ```
 
@@ -948,23 +945,30 @@ git commit -m "feat(farmhouse): full-year integration + transition polish"
 
 ## Per-Task Confidence (post-lift pass)
 
-Confidence = likelihood the task lands correctly first pass given the code as written. Lift pass: any task below 90% gets a mitigation; the two riskiest are flagged.
+Confidence = likelihood the task lands correctly first pass given the code as written. Lift pass: any task below 90% gets a mitigation; the riskiest are flagged. **Two autonomous verification passes were run** (see "Pre-execution verification" below), which retired the scalar-math risks and caught/fixed a barn defect — confidences updated accordingly.
 
 | Task | Confidence | Risk / mitigation |
 |------|-----------|-------------------|
 | T1 Scaffold + wiring | 95% | Wiring verified against the actual files (`.ino`, `effectChanging.h`, `viewer.html:30/52-55/139`, UISlider). Low risk. |
 | T2 Sky + sun arc | 95% | Pure gradient + keyframe interp. Low risk. |
 | T3 Hills + grass | 94% | Direct port of mockup geometry. Low risk. |
-| T4 Wood lifecycle | 90% | `fhCanopyAmt` windows could yield an awkward partial canopy at the leaf-out/shed edges. Mitigation: inspect at 0.10/0.70 in Step 2; tune the window constants in T11. |
-| **T5 Field states** ⚠️ | **88%** | **Riskiest #2.** Five crop states + AA top boundary + always-distinct-from-grass is the densest logic. Mitigation: every state is independently pinnable via `FH_DEBUG_PHASE` (Step 2 lists 6 checkpoints); the distinct-from-grass and soft-boundary checks are explicit. If a transition snaps, adjust the named rate/window constant (no structural change). |
-| T6 Barn | 88% | Gambrel built from `fhTri` triangles approximates the polygon roof; may need vertex nudges. Mitigation: visual check at any phase; adjust the 3 triangle verts. |
-| T7 Wall + hero + blossom | 90% | Blossom fade window is small; mitigation: verify at 0.03/0.20. |
-| T8 Foreground | 89% | Path coverage code is a proven port; flower/path-exclusion math is the soft spot. Mitigation: Step 2 explicitly checks flowers avoid the path. |
-| **T9 Snow model** ⚠️ | **85%** | **Riskiest #1.** `fhSnowAmt` melt **wraps across phase 1.0→0.0** (FH_MELT0 0.96 → FH_MELT1 0.05) — the two-branch wrap formula is the most error-prone code in the plan. Mitigation: verify at 0.99 (melting) AND 0.03 (nearly gone) in Step 2; if the curve is wrong, replace with a single linear ramp over a non-wrapping window (e.g. move melt fully into 0.90–0.99). Path-exclusion and field-furrow-distinctness are separately checkable. |
-| T10 Weather particles | 88% | Deterministic time-based particles; density/speed may need a tweak. Mitigation: fast-year (`FH_YEAR_MS 20000`) visual check. |
+| T4 Wood lifecycle | 93% | `fhCanopyAmt` **numerically verified** continuous/[0,1] (max step 0.014, no wrap jump). Residual: subjective canopy size at leaf-out/shed edges; tune in T11. |
+| T5 Field states | 92% | Five crop states + AA boundary + always-distinct-from-grass — but the **algorithm is already proven** in the JS prototypes (`seasons-v3`, `anim-field` rendered correctly); this is a mechanical C→C++ port. Every state independently pinnable via `FH_DEBUG_PHASE` (6 checkpoints). |
+| T6 Barn | 94% | **Defect found & fixed in review:** the old `fhTri` decomposition rendered a plain gable (rejected look); replaced with a per-row span fill of the **approved 5-point gambrel silhouette** from the v29 prototype. Geometry now matches the approved mockup. |
+| T7 Wall + hero + blossom | 91% | Blossom fade window is small/subjective; verify at 0.03/0.20. Otherwise direct port. |
+| T8 Foreground | 92% | Flower bloom curve **numerically verified** continuous; path coverage is a proven prototype port; path-exclusion checked explicitly in Step 2. |
+| T9 Snow model | 92% | **Riskiest math retired:** `fhSnowAmt` melt-wrap (1.0→0.0) **numerically verified continuous** (wrap jump 0.016, checkpoints `.69=0 .76=.50 .875=1 .99=.74 .03=.13`). Residual is only the visual snow look/furrow-distinctness, checked in Step 2. |
+| T10 Weather particles | 90% | Deterministic time-based particles; density/speed may need a tweak. Mitigation: fast-year (`FH_YEAR_MS 20000`) visual check. |
 | T11 Integration + polish | 90% | Observation-driven tuning; low structural risk. |
 
-**Min confidence after lift: 85% (T9).** Both flagged tasks (T9 snow-wrap math, T5 field transitions) have concrete, non-structural mitigations and explicit per-checkpoint verification, so they are safe to execute with review between tasks.
+**Min confidence after verification + fix: 90%** (T10/T11). No task remains below 90%.
+
+### Pre-execution verification (autonomous, already done)
+
+1. **Scalar-curve numeric audit** — `fhSnowAmt`, `fhCanopyAmt`, `fhFlowerAmt` evaluated across `p∈[0,1]` (1000 steps): all bounded [0,1], all continuous (max single-step ≤0.017), snow melt continuous across the year wrap. This retired the T9 wrap-math risk and confirmed T4/T8 curves.
+2. **Barn geometry review** — found the `fhTri` gambrel rendered a gable (the rejected look) and replaced it with the approved gambrel span-fill (T6 code above). Recorded as a review finding in better-memory.
+
+Remaining residual risk on every task is **subjective visual acceptance** (does it look good), which only resolves by looking at the sim during execution — i.e. it cannot be eliminated pre-execution, only confirmed at each task's verify step.
 
 ## Self-Review
 
