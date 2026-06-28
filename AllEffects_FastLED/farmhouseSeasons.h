@@ -10,7 +10,7 @@
 // Layered compositor, 60x60, one year on a ~4 min loop. y=0 top.
 // ============================================================================
 #define FH_YEAR_MS 240000UL        // full year (~4 min). Set 20000 to scrub fast.
-// #define FH_DEBUG_PHASE 0.375f   // uncomment to pin the year (e.g. 0.375 summer)
+// #define FH_DEBUG_PHASE 0.375f   // uncomment to pin the year (e.g. 0.375 summer, 0.875 winter)
 
 // season centres / boundaries
 #define FH_SPRING 0.125f
@@ -24,6 +24,8 @@
 #define FH_SNOW1    0.82f
 #define FH_MELT0    0.96f
 #define FH_MELT1    0.05f
+
+static float fhSnowAmt(float p);   // fwd decl (defined in SNOW section); used by foreground path
 
 // ---- math helpers ----
 static inline float fhClampf(float v,float lo,float hi){ return v<lo?lo:(v>hi?hi:v); }
@@ -247,9 +249,9 @@ static void fhDrawWall(float p){
 }
 
 static void fhDrawHeroTree(float p){
-  for(int y=40;y<47;y++){ fhPlot(12,y,CRGB(0x6B4A2B),1.0f); fhPlot(13,y,CRGB(0x6B4A2B),1.0f); }
   float amt=fhCanopyAmt(p);
-  if(amt<=0.02f) return;
+  if(amt<=0.02f) return;   // leafless winter tree is drawn on top of the snow (fhDrawBareTree)
+  for(int y=40;y<47;y++){ fhPlot(12,y,CRGB(0x6B4A2B),1.0f); fhPlot(13,y,CRGB(0x6B4A2B),1.0f); }
   static const float CL[6][4]={{12,34,3.2f,0},{10,37,3.0f,1},{14,37,3.0f,2},{12,38,3.4f,3},{13,33,2.4f,4},{10,34,2.2f,5}};
   for(int i=0;i<6;i++){
     CRGB c=fhFoliage(p,(uint8_t)CL[i][3]);
@@ -279,7 +281,8 @@ static void fhDrawForeground(float p){
   CRGB fg = (p<FH_AUTUMN)? CRGB(0x6FA537) : fhMix(CRGB(0x6FA537),CRGB(0xB6A24C),fhSmooth((p-FH_AUTUMN)/0.13f));
   for(int y=50;y<60;y++) fhFillRow(y,0,59,fg);
 
-  CRGB ptop=CRGB(0xC8B07A), pbot=CRGB(0xB49A63);
+  float snowP=fhSnowAmt(p);                               // winter: path goes icy grey-white (still visible)
+  CRGB ptop=fhMix(CRGB(0xC8B07A),CRGB(0xCFD4D8),snowP), pbot=fhMix(CRGB(0xB49A63),CRGB(0xBBC1C6),snowP);
   for(int y=49;y<60;y++){
     float c=fhPathCenter(y), hh=fhPathHalf(y), tt=(y-49)/11.0f;
     CRGB pc=fhMix(ptop,pbot,tt);
@@ -335,10 +338,31 @@ static float fhSnowCover(int x,int y,float p){
 static void fhDrawSnow(float p){
   if(fhSnowAmt(p)<=0.0f) return;
   for(int y=14;y<NUM_ROWS;y++) for(int x=0;x<NUM_COLS;x++){
+    // keep vertical structures visible: snow only on roof/ground/tops
+    if(x>=34 && x<=49 && y>=37 && y<46) continue;   // barn walls (roof y<37 still gets a cap)
+    if(y>=47 && y<50) continue;                      // stone-wall faces (top row 46 keeps a cap)
+    if(x>=27 && x<=32 && y>=44 && y<50) continue;    // wooden gate
     float cov=fhSnowCover(x,y,p); if(cov<=0) continue;
-    CRGB snow = (y>=24 && y<46 && ((x+y)%4==0)) ? CRGB(0xDCE6EC) : CRGB(0xEAF1F5);
-    fhPlot(x,y,snow,cov*0.92f);
+    // rolling snow drifts: wavy blue-grey shadow bands + white highlights (ref style),
+    // plus a gentle depth gradient toward the foreground. Field and hill share this tone.
+    float band=0.5f+0.5f*sinf(y*0.55f + 1.4f*sinf(x*0.13f) + sinf(x*0.05f));
+    float depth=fhClampf((y-14)/45.0f,0,1);
+    CRGB snow=fhMix(CRGB(0xF2F6FA),CRGB(0xBFD0E2), band*0.5f + depth*0.22f);
+    fhPlot(x,y,snow,cov);
   }
+}
+
+// bare hero tree, drawn ON TOP of the snow so it reads in the winter foreground
+static void fhDrawBareTree(float p){
+  if(fhCanopyAmt(p)>0.02f) return;                    // only when leafless (winter)
+  CRGB w=CRGB(0x4A3520);
+  for(int y=33;y<47;y++){ fhPlot(12,y,w,1.0f); fhPlot(13,y,w,1.0f); }       // trunk
+  fhPlot(11,37,w,1.0f); fhPlot(10,35,w,1.0f); fhPlot(9,34,w,1.0f);          // up-left limb
+  fhPlot(14,37,w,1.0f); fhPlot(15,35,w,1.0f); fhPlot(16,34,w,1.0f);         // up-right limb
+  fhPlot(12,33,w,1.0f); fhPlot(11,32,w,1.0f); fhPlot(13,32,w,1.0f);         // crown
+  fhPlot(10,39,w,1.0f); fhPlot(15,39,w,1.0f);                              // lower limbs
+  // a little snow caught on the branches
+  fhPlot(12,31,CRGB(0xEFF4F8),0.8f); fhPlot(9,33,CRGB(0xEFF4F8),0.7f); fhPlot(16,33,CRGB(0xEFF4F8),0.7f);
 }
 
 // =================== WEATHER PARTICLES ===================
@@ -372,6 +396,7 @@ static void fhRender(float p){
   fhDrawHeroTree(p);
   fhDrawForeground(p);
   fhDrawSnow(p);
+  fhDrawBareTree(p);
   fhDrawWeather(p);
 }
 
