@@ -9,7 +9,7 @@
 //   docs/superpowers/specs/2026-06-28-farmhouse-seasons-design.md
 // Layered compositor, 60x60, one year on a ~4 min loop. y=0 top.
 // ============================================================================
-#define FH_YEAR_MS 240000UL        // full year (~4 min). Set 20000 to scrub fast.
+#define FH_YEAR_MS 240000UL        // full year (~4 min). Set 20000-30000 to scrub fast.
 // #define FH_DEBUG_PHASE 0.375f   // uncomment to pin the year (0.08 spring, 0.375 summer, 0.72 autumn, 0.87 mid-winter)
 
 // season centres / boundaries
