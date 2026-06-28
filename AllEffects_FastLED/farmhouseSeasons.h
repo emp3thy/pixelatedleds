@@ -173,13 +173,14 @@ static void fhDrawWood(float p){
       int bl=(int)lroundf(fhGround(ax));
       int start=top+2+(ax&1);
       for(int ty=start; ty+4<=bl; ty+=4){
-        uint32_t h=(uint32_t)(ax*374761393 + ty*668265263); h=(h^(h>>13))*1274126177u;
-        if((h&7)==0) continue;                       // scattered gaps (not a filled grid)
-        int tx =ax + ((int)(h&3)-1);                 // x jitter -1..+2
-        int tyj=ty + ((int)((h>>2)&3)-1);            // y jitter -1..+2
+        uint32_t rng=((uint32_t)ax*374761393u + (uint32_t)ty*668265263u);  // unsigned (no signed overflow)
+        rng=(rng^(rng>>13))*1274126177u;
+        if((rng&7)==0) continue;                     // scattered gaps (not a filled grid)
+        int tx =ax + ((int)(rng&3)-1);               // x jitter -1..+2
+        int tyj=ty + ((int)((rng>>2)&3)-1);          // y jitter -1..+2
         if(tyj<top || tyj+2>=bl) tyj=ty;             // keep the tree on the hill
-        uint8_t seed=(uint8_t)(ax*3+ty+(h>>4));
-        float rad=2.0f + ((h>>5)&7)/7.0f*0.9f;       // varied canopy size 2.0..2.9
+        uint8_t seed=(uint8_t)(ax*3+ty+(rng>>4));
+        float rad=2.0f + ((rng>>5)&7)/7.0f*0.9f;     // varied canopy size 2.0..2.9
         fhPlot(tx,tyj+1,CRGB(0x4A3318),1.0f);
         fhPlot(tx,tyj+2,CRGB(0x4A3318),1.0f);
         if(amt>0.02f) fhDisc(tx,tyj, rad*amt+0.3f, fhFoliage(p,seed));
@@ -450,10 +451,13 @@ static void fhDrawLeaves(uint32_t t, float s){
 // (the snow layer covers them) and fade out during the spring melt
 static void fhDrawLeafPiles(float p){
   float acc;
-  if(p<0.64f) return;                                           // spring/summer: no piles
+  // melt span matches fhSnowAmt ((1-FH_MELT0)+FH_MELT1) and wraps the year, so the piles
+  // stay under the snow until it has finished melting rather than vanishing early.
+  if(p<FH_MELT1)       acc=1.0f-fhSmooth(((1.0f-FH_MELT0)+p)/((1.0f-FH_MELT0)+FH_MELT1)); // wrap tail
+  else if(p<0.64f) return;                                      // spring/summer: no piles
   else if(p<0.75f)     acc=(p-0.64f)/0.11f;                     // accumulate over autumn
   else if(p<FH_MELT0)  acc=1.0f;                                // hold through winter (snow buries them)
-  else                 acc=1.0f-fhSmooth((p-FH_MELT0)/(1.0f-FH_MELT0));  // fade out in the melt
+  else                 acc=1.0f-fhSmooth((p-FH_MELT0)/((1.0f-FH_MELT0)+FH_MELT1)); // fade out in the melt
   if(acc<=0.0f) return;
   static const uint8_t PX[27]={10,11,12,13,14, 19,20,21,22,23, 45,46,47,48,49, 11,12,13, 20,21,22, 46,47,48, 12,21,47};
   static const uint8_t PY[27]={56,56,56,56,56, 57,57,57,57,57, 56,56,56,56,56, 55,55,55, 56,56,56, 55,55,55, 54,55,54};
