@@ -62,6 +62,10 @@ static void fhGlow(float cx,float cy,float r,CRGB c,float maxA){
     fhPlot(x,y,c,a);
   }
 }
+static void fhLine(int x0,int y0,int x1,int y1,CRGB c){
+  int dx=abs(x1-x0),dy=-abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1,e=dx+dy;
+  for(;;){ fhPlot(x0,y0,c,1.0f); if(x0==x1&&y0==y1) break; int e2=2*e; if(e2>=dy){e+=dy;x0+=sx;} if(e2<=dx){e+=dx;y0+=sy;} }
+}
 
 static inline float fhGround(float x){
   return 24.0f + 1.8f*sinf(x*0.45f) + 1.3f*sinf(x*0.17f+2.0f);
@@ -91,12 +95,12 @@ static CRGB fhCycRGB(float p,const float* ph,const CRGB* col,int n){
 static const float FH_SKY_PH[]  = {0.0f, FH_SPRING, FH_SUMMER, FH_AUTUMN, FH_WINTER, 1.0f};
 static const CRGB  FH_SKY_TOP[] = {CRGB(0x8FCBEE),CRGB(0x8FCBEE),CRGB(0x7FC0EC),CRGB(0x9FC2D8),CRGB(0xAEB9C4),CRGB(0x8FCBEE)};
 static const CRGB  FH_SKY_BOT[] = {CRGB(0xD6EEF8),CRGB(0xD6EEF8),CRGB(0xCFE6F4),CRGB(0xE6E3CF),CRGB(0xDBE1E6),CRGB(0xD6EEF8)};
-static const CRGB  FH_SUN_COL[] = {CRGB(0xFFE9A0),CRGB(0xFFE9A0),CRGB(0xFFE27A),CRGB(0xFFD27A),CRGB(0xF6EFD2),CRGB(0xFFE9A0)};
+static const CRGB  FH_SUN_COL[] = {CRGB(0xFFE9A0),CRGB(0xFFE9A0),CRGB(0xFFE27A),CRGB(0xFFD27A),CRGB(0xFFF3C8),CRGB(0xFFE9A0)};
 
 static const float FH_SUNY_PH[]  = {0.0f, FH_SPRING, FH_SUMMER, FH_AUTUMN, 0.875f, 1.0f};
-static const float FH_SUNY_VAL[] = {8.0f, 7.0f,      6.0f,      9.0f,      12.0f,   8.0f};
+static const float FH_SUNY_VAL[] = {8.0f, 7.0f,      6.0f,      9.0f,       9.0f,   8.0f};
 static const float FH_SUNR_PH[]  = {0.0f, FH_SUMMER, FH_WINTER, 1.0f};
-static const float FH_SUNR_VAL[] = {4.0f, 4.0f,      3.0f,      4.0f};
+static const float FH_SUNR_VAL[] = {4.0f, 4.0f,      5.0f,      4.0f};
 static inline float fhSunY(float p){ return fhCycF(p,FH_SUNY_PH,FH_SUNY_VAL,6); }
 
 static void fhDrawSky(float p){
@@ -108,7 +112,9 @@ static void fhDrawSky(float p){
   }
   float r=fhCycF(p,FH_SUNR_PH,FH_SUNR_VAL,4);
   CRGB sc=fhCycRGB(p,FH_SKY_PH,FH_SUN_COL,6);
-  fhDisc(50.0f, fhSunY(p), r, sc);
+  float sy=fhSunY(p);
+  fhGlow(50.0f, sy, r*2.6f, sc, 0.55f);     // halo -> brighter, softer sun
+  fhDisc(50.0f, sy, r, sc);                 // (winter: low + big, hills occlude its lower half)
 }
 
 // =================== HILLS ===================
@@ -235,7 +241,10 @@ static void fhGambrelRoof(CRGB c){
   }
 }
 static void fhDrawBarn(float p){
-  fhGambrelRoof(CRGB(0xC6CBD2));                              // light-grey roof (definition vs sky)
+  fhGambrelRoof(CRGB(0xE6E2D6));                              // cream roof
+  CRGB ol=CRGB(0x6E5A48);                                     // clean dark gambrel outline
+  fhLine(42,31,36,34,ol); fhLine(36,34,33,37,ol);
+  fhLine(42,31,48,34,ol); fhLine(48,34,51,37,ol);
   for(int y=37;y<46;y++) fhFillRow(y,34,49,CRGB(0xBE3B2C));   // red body
   for(int y=37;y<46;y++){ fhPlot(38,y,CRGB(0xB23528),1.0f); fhPlot(45,y,CRGB(0xB23528),1.0f); }
   for(int y=40;y<46;y++) fhFillRow(y,40,46,CRGB(0x241006));   // open doorway
@@ -361,8 +370,8 @@ static float fhSnowCover(int x,int y,float p){
 static void fhDrawSnow(float p){
   if(fhSnowAmt(p)<=0.0f) return;
   for(int y=14;y<NUM_ROWS;y++) for(int x=0;x<NUM_COLS;x++){
-    // keep vertical structures visible: snow only on roof/ground/tops
-    if(x>=34 && x<=49 && y>=37 && y<46) continue;   // barn walls (roof y<37 still gets a cap)
+    // keep structures clean: drift-snow off the barn, wall faces, gate (handled separately)
+    if(x>=33 && x<=51 && y>=31 && y<46) continue;   // whole barn (roof snow drawn cleanly post-snow)
     if(y>=47 && y<50) continue;                      // stone-wall faces (top row 46 keeps a cap)
     if(x>=27 && x<=32 && y>=44 && y<50) continue;    // wooden gate
     float cov=fhSnowCover(x,y,p); if(cov<=0) continue;
@@ -388,14 +397,15 @@ static void fhDrawBareTree(float p){
   fhPlot(12,31,CRGB(0xEFF4F8),0.8f); fhPlot(9,33,CRGB(0xEFF4F8),0.7f); fhPlot(16,33,CRGB(0xEFF4F8),0.7f);
 }
 
-// winter: outline the snow-capped barn roof so it reads against the pale sky
-static void fhDrawSnowyRoofEdge(float p){
+// winter: clean white snow cap over the upper gambrel (keeps the dark outline showing below)
+static void fhDrawRoofSnow(float p){
   if(fhSnowAmt(p)<=0.2f) return;
-  CRGB edge=CRGB(0xAEB4BC);
-  for(int y=31;y<=37;y++){
+  for(int y=31;y<=35;y++){
     float L,R; if(y<34){float hw=(y-31)*2.0f;L=42-hw;R=42+hw;} else {float k=(y-34);L=36-k;R=48+k;}
-    fhPlot((int)lroundf(L),y,edge,0.85f);
-    fhPlot((int)lroundf(R),y,edge,0.85f);
+    for(int x=(int)floorf(L);x<=(int)ceilf(R);x++){
+      float cov=fhClampf(min((float)x+1,R)-max((float)x,L),0,1);
+      fhPlot(x,y,CRGB(0xF2F6FA),cov);
+    }
   }
 }
 
@@ -405,31 +415,24 @@ static void fhDrawXmasTree(float p){
   float amt = fhSmooth((p-0.815f)/0.015f) * (1.0f - fhSmooth((p-0.905f)/0.015f));
   if(amt<=0.05f) return;
   CRGB g=CRGB(0x1F6B2E);
-  fhPlot(19,42,g,amt);
-  fhPlot(18,43,g,amt); fhPlot(19,43,g,amt); fhPlot(20,43,g,amt);
-  fhPlot(18,44,g,amt); fhPlot(19,44,g,amt); fhPlot(20,44,g,amt);
-  for(int x=17;x<=21;x++){ fhPlot(x,45,g,amt); fhPlot(x,46,g,amt); }
-  for(int x=16;x<=22;x++){ fhPlot(x,47,g,amt); fhPlot(x,48,g,amt); }
-  fhPlot(19,49,CRGB(0x5A3F22),amt);                  // trunk base
+  // big conifer centred on x=12, directly in front of the bare tree (rows 38..49)
+  static const int8_t rowL[12]={12,11,11,10,10, 9, 9, 8, 8, 8,12,12};
+  static const int8_t rowR[12]={12,13,13,14,14,15,15,16,16,16,12,12};
+  for(int i=0;i<12;i++){ int y=38+i; CRGB c=(i>=10)?CRGB(0x5A3F22):g;   // last 2 rows = trunk
+    for(int x=rowL[i];x<=rowR[i];x++) fhPlot(x,y,c,amt); }
   uint32_t t=millis();
-  float sb=0.6f+0.4f*sinf(t*0.004f);                 // star twinkle
-  fhPlot(19,41,CRGB(0xFFE24A),amt*fhClampf(sb,0,1));
-  static const int  LX[8]={18,20,17,21,19,16,22,18};
-  static const int  LY[8]={44,45,46,47,46,48,48,47};
+  float sb=0.6f+0.4f*sinf(t*0.004f);                                    // star twinkle
+  fhPlot(12,37,CRGB(0xFFE24A),amt*fhClampf(sb,0,1));
+  static const int  LX[12]={11,13,10,14,12, 9,15,11,13,12,10,14};
+  static const int  LY[12]={40,41,43,43,42,45,45,46,46,44,46,47};
   static const CRGB PAL[4]={CRGB(0xFF3B30),CRGB(0xFFD24A),CRGB(0x4AA8FF),CRGB(0xCFFFD6)};
-  for(int i=0;i<8;i++){
-    float b=0.45f+0.55f*sinf(t*0.006f + i*2.1f);     // each light twinkles
-    CRGB c=PAL[(i + (int)(t/600))%4];                // colours cycle
+  for(int i=0;i<12;i++){
+    float b=0.45f+0.55f*sinf(t*0.006f + i*1.7f);                        // each light twinkles
+    CRGB c=PAL[(i + (int)(t/600))%4];                                   // colours cycle
     fhPlot(LX[i],LY[i],c,amt*fhClampf(b,0,1));
   }
 }
 
-// winter: soft hazy low sun over the snow (the sky sun gets painted over by the snowy hills)
-static void fhDrawWinterSun(float p){
-  if(fhSnowAmt(p)<=0.2f) return;
-  fhGlow(50.0f, 9.0f, 8.0f, CRGB(0xFBF4DE), 0.85f);
-  fhDisc(50.0f, 9.0f, 2.2f, CRGB(0xFDF6E2));
-}
 
 // =================== WEATHER PARTICLES ===================
 #define FH_NPART 40
@@ -462,8 +465,7 @@ static void fhRender(float p){
   fhDrawHeroTree(p);
   fhDrawForeground(p);
   fhDrawSnow(p);
-  fhDrawWinterSun(p);
-  fhDrawSnowyRoofEdge(p);
+  fhDrawRoofSnow(p);
   fhDrawBarnWindow(p);
   fhDrawBareTree(p);
   fhDrawXmasTree(p);
