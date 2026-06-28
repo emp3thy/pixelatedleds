@@ -98,7 +98,7 @@
   const getStripPixelData= Module.cwrap('getStripPixelData', 'number', ['number','number']);
   const getScreenMapData = Module.cwrap('getScreenMapData', 'number', ['number']);
   const processUiInput   = Module.cwrap('processUiInput', null, ['string']);
-  const SLIDER_NAME      = 'Pattern (0-20)';   // UISlider name; UI manager matches by name
+  const SLIDER_NAME      = 'Pattern (0-21)';   // UISlider name; UI manager matches by name
 
   const readJson = (getter) => {
     const sizePtr = Module._malloc(4);
