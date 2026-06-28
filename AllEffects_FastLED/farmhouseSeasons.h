@@ -457,18 +457,20 @@ static void fhDrawWeather(float p){
   float leavesS = (p>=0.64f && p<0.76f)? fhSmooth((p-0.64f)/0.05f)*(1.0f-fhSmooth((p-0.71f)/0.05f)) : 0.0f;
   float snow    = (p>=FH_SNOW0 && p<FH_MELT0)? 1.0f : 0.0f;
   uint32_t t=millis();
-  // spring showers: blue rain, intermittent (~50% on/off over ~80s)
-  bool springRain = (p>=0.04f && p<FH_SUMMER) && (sinf((float)t*0.00008f) > 0.0f);
-  if(snow>0.0f || springRain){
+  bool springTime = (p>=0.04f && p<FH_SUMMER);     // spring showers come and go (~50% over ~80s)
+  if(snow>0.0f || springTime){
     for(int i=0;i<FH_NPART;i++){
       float col=(float)((i*37)%60);
-      float speed=springRain?(15.0f+(i%5)):(6.0f+(i%5));
-      float sway=sinf((t*0.0012f)+(i*1.3f))*(springRain?0.6f:2.0f);
+      float speed=springTime?(15.0f+(i%5)):(6.0f+(i%5));
+      float sway=sinf((t*0.0012f)+(i*1.3f))*(springTime?0.6f:2.0f);
       float fall=fmodf((t*0.001f*speed)+(i*7),64.0f);
       int x=(int)(col+sway),y=(int)(fall-4);
       if(y<0||y>=NUM_ROWS||x<0||x>=NUM_COLS) continue;
       if(snow>0.0f) fhPlot(x,y,CRGB(0xF2F6F8),0.9f);
-      else          fhPlot(x,y,CRGB(0x5AA0E6),1.0f);        // blue rain (opaque)
+      else {                                                 // rain: draw a drop only if it LEFT THE TOP while raining
+        float tTop=(float)t - fall/(0.001f*speed);           // ms when this drop was at the top
+        if(sinf(tTop*0.00008f) > 0.0f) fhPlot(x,y,CRGB(0x5AA0E6),1.0f);  // stops spawning when the shower ends; in-flight drops finish
+      }
     }
   }
   if(leavesS>0.05f){ fhDrawLeafPiles(p); fhDrawLeaves(t, leavesS); }
