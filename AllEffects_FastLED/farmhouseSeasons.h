@@ -10,7 +10,7 @@
 // Layered compositor, 60x60, one year on a ~4 min loop. y=0 top.
 // ============================================================================
 #define FH_YEAR_MS 240000UL        // full year (~4 min). Set 20000 to scrub fast.
-// #define FH_DEBUG_PHASE 0.375f   // uncomment to pin the year (0.08 spring, 0.375 summer, 0.70 autumn, 0.87 mid-winter)
+// #define FH_DEBUG_PHASE 0.375f   // uncomment to pin the year (0.08 spring, 0.375 summer, 0.72 autumn, 0.87 mid-winter)
 
 // season centres / boundaries
 #define FH_SPRING 0.125f
@@ -427,27 +427,51 @@ static void fhDrawXmasTree(float p){
 
 // =================== WEATHER PARTICLES ===================
 #define FH_NPART 40
+#define FH_NLEAF 3
+// autumn leaves: only 2-3 at a time, each spawning at a tree's canopy and fluttering down below it
+static void fhDrawLeaves(uint32_t t, float s){
+  for(int i=0;i<FH_NLEAF;i++){
+    float period = 4200.0f + i*1500.0f;                     // each leaf its own fall time
+    uint32_t span=(uint32_t)period;
+    float ph = (float)((t + i*1700u) % span) / period;      // 0..1 fall progress
+    uint32_t cyc=(t + i*1700u)/span;                        // which fall (new tree each time)
+    uint32_t h=(cyc*2654435761u) ^ (i*40503u); h^=h>>13; h*=1274126177u;
+    float treeX = 5.0f + (float)(h % 50);                   // a tree somewhere on the wooded hills
+    float startY= 9.0f + (float)((h>>6)%12);                // that tree's canopy height (not the screen top)
+    float fy = startY + (54.0f-startY)*fhClampf(ph/0.85f,0.0f,1.0f);   // reaches the grass by ph~0.85
+    float x  = treeX + ((ph<0.85f)? sinf(ph*7.0f+i*2.0f)*2.5f : 0.0f); // stops fluttering once it lands
+    fhPlot((int)x,(int)fy, FH_TURN[(h>>2)%7], s);
+  }
+}
+// landed leaves accumulate into little piles on the grass through autumn
+static void fhDrawLeafPiles(float p){
+  float acc=fhClampf((p-0.64f)/0.11f,0,1);
+  if(acc<=0.0f) return;
+  static const uint8_t PX[27]={10,11,12,13,14, 19,20,21,22,23, 45,46,47,48,49, 11,12,13, 20,21,22, 46,47,48, 12,21,47};
+  static const uint8_t PY[27]={56,56,56,56,56, 57,57,57,57,57, 56,56,56,56,56, 55,55,55, 56,56,56, 55,55,55, 54,55,54};
+  int K=(int)(acc*27.0f+0.5f);
+  for(int i=0;i<K;i++) fhPlot(PX[i],PY[i],FH_TURN[(i*3)%7],0.95f);
+}
 static void fhDrawWeather(float p){
   // leaf-fall tracks the shed window: ramps up ~0.64, fades out by ~0.76 (bare into winter)
-  float leaves = (p>=0.64f && p<0.76f)? fhSmooth((p-0.64f)/0.05f)*(1.0f-fhSmooth((p-0.71f)/0.05f)) : 0.0f;
-  float snow   = (p>=FH_SNOW0 && p<FH_MELT0)? 1.0f : 0.0f;
+  float leavesS = (p>=0.64f && p<0.76f)? fhSmooth((p-0.64f)/0.05f)*(1.0f-fhSmooth((p-0.71f)/0.05f)) : 0.0f;
+  float snow    = (p>=FH_SNOW0 && p<FH_MELT0)? 1.0f : 0.0f;
   uint32_t t=millis();
   // spring showers: blue rain, intermittent (~50% on/off over ~80s)
   bool springRain = (p>=0.04f && p<FH_SUMMER) && (sinf((float)t*0.00008f) > 0.0f);
-  for(int i=0;i<FH_NPART;i++){
-    bool isLeaf=(leaves>0);
-    if(isLeaf && (i&1)) continue;                                  // sparser leaves (half)
-    float col = (float)((i*37)%60);
-    float speed = springRain ? (15.0f+(i%5)) : isLeaf ? (3.0f+(i%3)) : (6.0f+(i%5));   // leaves drift slowly
-    float swayA = springRain ? 0.6f : isLeaf ? 3.5f : 2.0f;        // leaves flutter side to side
-    float sway = sinf((t*0.0012f)+(i*1.3f))*swayA;
-    float fall = fmodf((t*0.001f*speed)+(i*7), 64.0f);
-    int x=(int)(col+sway), y=(int)(fall-4);
-    if(y<0||y>=NUM_ROWS||x<0||x>=NUM_COLS) continue;
-    if(snow>0)          fhPlot(x,y,CRGB(0xF2F6F8),0.9f);
-    else if(isLeaf)     fhPlot(x,y,FH_TURN[i%7],0.85f*leaves);
-    else if(springRain) fhPlot(x,y,CRGB(0x5AA0E6),1.0f);           // blue rain (opaque)
+  if(snow>0.0f || springRain){
+    for(int i=0;i<FH_NPART;i++){
+      float col=(float)((i*37)%60);
+      float speed=springRain?(15.0f+(i%5)):(6.0f+(i%5));
+      float sway=sinf((t*0.0012f)+(i*1.3f))*(springRain?0.6f:2.0f);
+      float fall=fmodf((t*0.001f*speed)+(i*7),64.0f);
+      int x=(int)(col+sway),y=(int)(fall-4);
+      if(y<0||y>=NUM_ROWS||x<0||x>=NUM_COLS) continue;
+      if(snow>0.0f) fhPlot(x,y,CRGB(0xF2F6F8),0.9f);
+      else          fhPlot(x,y,CRGB(0x5AA0E6),1.0f);        // blue rain (opaque)
+    }
   }
+  if(leavesS>0.05f){ fhDrawLeafPiles(p); fhDrawLeaves(t, leavesS); }
 }
 
 // =================== COMPOSITOR ===================
