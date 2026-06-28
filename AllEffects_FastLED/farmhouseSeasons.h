@@ -10,7 +10,7 @@
 // Layered compositor, 60x60, one year on a ~4 min loop. y=0 top.
 // ============================================================================
 #define FH_YEAR_MS 240000UL        // full year (~4 min). Set 20000 to scrub fast.
-// #define FH_DEBUG_PHASE 0.375f   // uncomment to pin the year (0.08 spring, 0.375 summer, 0.87 mid-winter)
+// #define FH_DEBUG_PHASE 0.375f   // uncomment to pin the year (0.08 spring, 0.375 summer, 0.70 autumn, 0.87 mid-winter)
 
 // season centres / boundaries
 #define FH_SPRING 0.125f
@@ -20,8 +20,8 @@
 // discrete event windows
 #define FH_HARVEST0 0.62f
 #define FH_HARVEST1 0.68f
-#define FH_SNOW0    0.70f
-#define FH_SNOW1    0.82f
+#define FH_SNOW0    0.76f
+#define FH_SNOW1    0.86f
 #define FH_MELT0    0.96f
 #define FH_MELT1    0.05f
 
@@ -146,20 +146,20 @@ static void fhDrawHills(float p){
 
 // =================== WOOD (hill trees) ===================
 static const CRGB FH_GREEN[7] ={CRGB(0x347E3A),CRGB(0x2E7434),CRGB(0x46A24E),CRGB(0x3E9446),CRGB(0x52AE59),CRGB(0x43994A),CRGB(0x3C913F)};
-static const CRGB FH_TURN[7]  ={CRGB(0xE0892E),CRGB(0xD6552B),CRGB(0xE8B23A),CRGB(0xC24A2A),CRGB(0xB5862F),CRGB(0xE0A030),CRGB(0xD67A2A)};
+static const CRGB FH_TURN[7]  ={CRGB(0xE0892E),CRGB(0xD6552B),CRGB(0xE8B23A),CRGB(0xC24A2A),CRGB(0x8A5A2A),CRGB(0xE0A030),CRGB(0xD67A2A)}; // orange/red/yellow + 1 brown
 static const CRGB FH_SPRGRN[7]={CRGB(0x86C552),CRGB(0xA6D86A),CRGB(0x6FB23E),CRGB(0x9ACB5A),CRGB(0x7CC04A),CRGB(0xA0D060),CRGB(0x8AC850)};
 
 static float fhCanopyAmt(float p){
   if(p<FH_SPRING) return fhSmooth((p-0.02f)/(FH_SPRING-0.02f));
-  if(p<FH_AUTUMN) return 1.0f;
-  if(p<0.78f)     return 1.0f-fhSmooth((p-FH_AUTUMN)/(0.78f-FH_AUTUMN));
+  if(p<0.66f) return 1.0f;                                       // full leaf until late autumn
+  if(p<0.75f) return 1.0f-fhSmooth((p-0.66f)/(0.75f-0.66f));     // shed -> bare by end of autumn
   return 0.0f;
 }
 static CRGB fhFoliage(float p,uint8_t seed){
   CRGB summer=FH_GREEN[seed%7];
   if(p<FH_SPRING) return fhMix(FH_SPRGRN[seed%7],summer,fhSmooth(p/FH_SPRING));
-  if(p<FH_AUTUMN) return summer;
-  float t=fhSmooth((p-FH_AUTUMN)/(0.78f-FH_AUTUMN));
+  if(p<0.55f) return summer;                                     // green through summer/early autumn
+  float t=fhSmooth((p-0.55f)/(0.68f-0.55f));                     // green -> autumn colour 0.55..0.68
   return fhMix(summer,FH_TURN[seed%7],t);
 }
 
@@ -428,21 +428,25 @@ static void fhDrawXmasTree(float p){
 // =================== WEATHER PARTICLES ===================
 #define FH_NPART 40
 static void fhDrawWeather(float p){
-  float leaves = (p>=FH_AUTUMN && p<FH_SNOW0)? fhSmooth((p-FH_AUTUMN)/(FH_SNOW0-FH_AUTUMN)) : 0.0f;
+  // leaf-fall tracks the shed window: ramps up ~0.64, fades out by ~0.76 (bare into winter)
+  float leaves = (p>=0.64f && p<0.76f)? fhSmooth((p-0.64f)/0.05f)*(1.0f-fhSmooth((p-0.71f)/0.05f)) : 0.0f;
   float snow   = (p>=FH_SNOW0 && p<FH_MELT0)? 1.0f : 0.0f;
   uint32_t t=millis();
   // spring showers: blue rain, intermittent (~50% on/off over ~80s)
   bool springRain = (p>=0.04f && p<FH_SUMMER) && (sinf((float)t*0.00008f) > 0.0f);
   for(int i=0;i<FH_NPART;i++){
+    bool isLeaf=(leaves>0);
+    if(isLeaf && (i&1)) continue;                                  // sparser leaves (half)
     float col = (float)((i*37)%60);
-    float speed = springRain ? (15.0f + (i%5)) : (6.0f + (i%5));   // rain falls faster
-    float sway = sinf((t*0.001f)+(i*1.3f))* (springRain?0.6f:2.0f); // rain barely drifts
+    float speed = springRain ? (15.0f+(i%5)) : isLeaf ? (3.0f+(i%3)) : (6.0f+(i%5));   // leaves drift slowly
+    float swayA = springRain ? 0.6f : isLeaf ? 3.5f : 2.0f;        // leaves flutter side to side
+    float sway = sinf((t*0.0012f)+(i*1.3f))*swayA;
     float fall = fmodf((t*0.001f*speed)+(i*7), 64.0f);
     int x=(int)(col+sway), y=(int)(fall-4);
     if(y<0||y>=NUM_ROWS||x<0||x>=NUM_COLS) continue;
     if(snow>0)          fhPlot(x,y,CRGB(0xF2F6F8),0.9f);
-    else if(leaves>0)   fhPlot(x,y,FH_TURN[i%7],0.85f*leaves);
-    else if(springRain) fhPlot(x,y,CRGB(0x5AA0E6),1.0f);    // blue rain (opaque -> no brown tint over the field)
+    else if(isLeaf)     fhPlot(x,y,FH_TURN[i%7],0.85f*leaves);
+    else if(springRain) fhPlot(x,y,CRGB(0x5AA0E6),1.0f);           // blue rain (opaque)
   }
 }
 
