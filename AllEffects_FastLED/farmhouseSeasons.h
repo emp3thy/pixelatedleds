@@ -10,7 +10,7 @@
 // Layered compositor, 60x60, one year on a ~4 min loop. y=0 top.
 // ============================================================================
 #define FH_YEAR_MS 240000UL        // full year (~4 min). Set 20000 to scrub fast.
-// #define FH_DEBUG_PHASE 0.375f   // uncomment to pin the year (0.375 summer, 0.87 mid-winter)
+// #define FH_DEBUG_PHASE 0.375f   // uncomment to pin the year (0.08 spring, 0.375 summer, 0.87 mid-winter)
 
 // season centres / boundaries
 #define FH_SPRING 0.125f
@@ -167,12 +167,12 @@ static void fhDrawWood(float p){
   float amt=fhCanopyAmt(p);
   for(int h=0;h<2;h++){
     const FhHill& H=FH_HILLS[h];
-    for(int ax=(int)(H.cx-H.rx)+3; ax<=(int)(H.cx+H.rx)-3; ax+=3){
-      float n=(ax-H.cx)/H.rx; if(n<-0.92f||n>0.92f) continue;
+    for(int ax=(int)(H.cx-H.rx)+2; ax<=(int)(H.cx+H.rx)-2; ax+=2){
+      float n=(ax-H.cx)/H.rx; if(n<-0.94f||n>0.94f) continue;
       int top=24-(int)lroundf(H.ry*sqrtf(1.0f-n*n));
       int bl=(int)lroundf(fhGround(ax));
       int start=top+2+(ax&1);
-      for(int ty=start; ty+4<=bl; ty+=5){
+      for(int ty=start; ty+4<=bl; ty+=4){
         int tx=ax+((ty&1)?1:0);
         uint8_t seed=(uint8_t)(ax*3+ty);
         fhPlot(tx,ty+1,CRGB(0x4A3318),1.0f);
@@ -425,18 +425,19 @@ static void fhDrawXmasTree(float p){
 static void fhDrawWeather(float p){
   float leaves = (p>=FH_AUTUMN && p<FH_SNOW0)? fhSmooth((p-FH_AUTUMN)/(FH_SNOW0-FH_AUTUMN)) : 0.0f;
   float snow   = (p>=FH_SNOW0 && p<FH_MELT0)? 1.0f : 0.0f;
-  float petals = (p<FH_SPRING)? fhSmooth(1.0f-(p/FH_SPRING)) : 0.0f;
   uint32_t t=millis();
+  // spring showers: blue rain, intermittent (~50% on/off over ~80s)
+  bool springRain = (p>=0.04f && p<FH_SUMMER) && (sinf((float)t*0.00008f) > 0.0f);
   for(int i=0;i<FH_NPART;i++){
     float col = (float)((i*37)%60);
-    float speed = 6.0f + (i%5);
-    float sway = sinf((t*0.001f)+(i*1.3f))*2.0f;
+    float speed = springRain ? (15.0f + (i%5)) : (6.0f + (i%5));   // rain falls faster
+    float sway = sinf((t*0.001f)+(i*1.3f))* (springRain?0.6f:2.0f); // rain barely drifts
     float fall = fmodf((t*0.001f*speed)+(i*7), 64.0f);
     int x=(int)(col+sway), y=(int)(fall-4);
     if(y<0||y>=NUM_ROWS||x<0||x>=NUM_COLS) continue;
-    if(snow>0)        fhPlot(x,y,CRGB(0xF2F6F8),0.9f);
-    else if(leaves>0) fhPlot(x,y,FH_TURN[i%7],0.85f*leaves);
-    else if(petals>0) fhPlot(x,y,CRGB(0xF7CBD9),0.8f*petals);
+    if(snow>0)          fhPlot(x,y,CRGB(0xF2F6F8),0.9f);
+    else if(leaves>0)   fhPlot(x,y,FH_TURN[i%7],0.85f*leaves);
+    else if(springRain) fhPlot(x,y,CRGB(0x5AA0E6),1.0f);    // blue rain (opaque -> no brown tint over the field)
   }
 }
 
