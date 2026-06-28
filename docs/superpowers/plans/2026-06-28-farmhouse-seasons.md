@@ -946,6 +946,26 @@ git commit -m "feat(farmhouse): full-year integration + transition polish"
 
 ---
 
+## Per-Task Confidence (post-lift pass)
+
+Confidence = likelihood the task lands correctly first pass given the code as written. Lift pass: any task below 90% gets a mitigation; the two riskiest are flagged.
+
+| Task | Confidence | Risk / mitigation |
+|------|-----------|-------------------|
+| T1 Scaffold + wiring | 95% | Wiring verified against the actual files (`.ino`, `effectChanging.h`, `viewer.html:30/52-55/139`, UISlider). Low risk. |
+| T2 Sky + sun arc | 95% | Pure gradient + keyframe interp. Low risk. |
+| T3 Hills + grass | 94% | Direct port of mockup geometry. Low risk. |
+| T4 Wood lifecycle | 90% | `fhCanopyAmt` windows could yield an awkward partial canopy at the leaf-out/shed edges. Mitigation: inspect at 0.10/0.70 in Step 2; tune the window constants in T11. |
+| **T5 Field states** ⚠️ | **88%** | **Riskiest #2.** Five crop states + AA top boundary + always-distinct-from-grass is the densest logic. Mitigation: every state is independently pinnable via `FH_DEBUG_PHASE` (Step 2 lists 6 checkpoints); the distinct-from-grass and soft-boundary checks are explicit. If a transition snaps, adjust the named rate/window constant (no structural change). |
+| T6 Barn | 88% | Gambrel built from `fhTri` triangles approximates the polygon roof; may need vertex nudges. Mitigation: visual check at any phase; adjust the 3 triangle verts. |
+| T7 Wall + hero + blossom | 90% | Blossom fade window is small; mitigation: verify at 0.03/0.20. |
+| T8 Foreground | 89% | Path coverage code is a proven port; flower/path-exclusion math is the soft spot. Mitigation: Step 2 explicitly checks flowers avoid the path. |
+| **T9 Snow model** ⚠️ | **85%** | **Riskiest #1.** `fhSnowAmt` melt **wraps across phase 1.0→0.0** (FH_MELT0 0.96 → FH_MELT1 0.05) — the two-branch wrap formula is the most error-prone code in the plan. Mitigation: verify at 0.99 (melting) AND 0.03 (nearly gone) in Step 2; if the curve is wrong, replace with a single linear ramp over a non-wrapping window (e.g. move melt fully into 0.90–0.99). Path-exclusion and field-furrow-distinctness are separately checkable. |
+| T10 Weather particles | 88% | Deterministic time-based particles; density/speed may need a tweak. Mitigation: fast-year (`FH_YEAR_MS 20000`) visual check. |
+| T11 Integration + polish | 90% | Observation-driven tuning; low structural risk. |
+
+**Min confidence after lift: 85% (T9).** Both flagged tasks (T9 snow-wrap math, T5 field transitions) have concrete, non-structural mitigations and explicit per-checkpoint verification, so they are safe to execute with review between tasks.
+
 ## Self-Review
 
 **Spec coverage** (each spec section → task):
