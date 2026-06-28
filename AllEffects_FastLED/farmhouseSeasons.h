@@ -388,8 +388,8 @@ static void fhDrawSnow(float p){
 // bare hero tree, drawn ON TOP of the snow so it reads in the winter foreground
 static void fhDrawBareTree(float p){
   if(fhCanopyAmt(p)>0.02f) return;                    // only when leafless (winter)
-  float xa=fhSmooth((p-0.815f)/0.015f)*(1.0f-fhSmooth((p-0.905f)/0.015f));
-  if(xa>0.2f) return;                                 // hidden behind the Christmas tree
+  float xr=fhSmooth((p-0.815f)/0.02f)*(1.0f-fhSmooth((p-0.90f)/0.02f));
+  if(xr>0.15f) return;                                // hidden while the Christmas tree is up
   CRGB w=CRGB(0x4A3520);
   for(int y=33;y<47;y++){ fhPlot(12,y,w,1.0f); fhPlot(13,y,w,1.0f); }       // trunk
   fhPlot(11,37,w,1.0f); fhPlot(10,35,w,1.0f); fhPlot(9,34,w,1.0f);          // up-left limb
@@ -403,24 +403,27 @@ static void fhDrawBareTree(float p){
 // winter easter egg: a small lit Christmas tree in front of the bare tree,
 // only during the MIDDLE THIRD of winter (~0.83..0.905), fading in/out at the edges.
 static void fhDrawXmasTree(float p){
-  float amt = fhSmooth((p-0.815f)/0.015f) * (1.0f - fhSmooth((p-0.905f)/0.015f));
-  if(amt<=0.05f) return;
+  // grows up out of the ground, holds, then sinks back into it (no instant pop)
+  float rise = fhSmooth((p-0.815f)/0.02f) * (1.0f - fhSmooth((p-0.90f)/0.02f));
+  if(rise<=0.01f) return;
+  int off=(int)((1.0f-rise)*14.0f+0.5f);                               // push down when not fully risen
   CRGB g=CRGB(0x1F6B2E);
-  // big conifer centred on x=12, directly in front of the bare tree (rows 38..49)
+  // big conifer centred on x=12, directly in front of the bare tree
   static const int8_t rowL[12]={12,11,11,10,10, 9, 9, 8, 8, 8,12,12};
   static const int8_t rowR[12]={12,13,13,14,14,15,15,16,16,16,12,12};
-  for(int i=0;i<12;i++){ int y=38+i; CRGB c=(i>=10)?CRGB(0x5A3F22):g;   // last 2 rows = trunk
-    for(int x=rowL[i];x<=rowR[i];x++) fhPlot(x,y,c,amt); }
+  for(int i=0;i<12;i++){ int y=38+i+off; if(y>=50) continue;           // clip at the ground line (sinks in)
+    CRGB c=(i>=10)?CRGB(0x5A3F22):g;
+    for(int x=rowL[i];x<=rowR[i];x++) fhPlot(x,y,c,1.0f); }
   uint32_t t=millis();
-  float sb=0.6f+0.4f*sinf(t*0.004f);                                    // star twinkle
-  fhPlot(12,37,CRGB(0xFFE24A),amt*fhClampf(sb,0,1));
+  float sb=0.6f+0.4f*sinf(t*0.004f);                                   // star twinkle
+  { int sy=37+off; if(sy<50) fhPlot(12,sy,CRGB(0xFFE24A),fhClampf(sb,0,1)); }
   static const int  LX[12]={11,13,10,14,12, 9,15,11,13,12,10,14};
   static const int  LY[12]={40,41,43,43,42,45,45,46,46,44,46,47};
   static const CRGB PAL[4]={CRGB(0xFF3B30),CRGB(0xFFD24A),CRGB(0x4AA8FF),CRGB(0xCFFFD6)};
-  for(int i=0;i<12;i++){
-    float b=0.45f+0.55f*sinf(t*0.006f + i*1.7f);                        // each light twinkles
-    CRGB c=PAL[(i + (int)(t/600))%4];                                   // colours cycle
-    fhPlot(LX[i],LY[i],c,amt*fhClampf(b,0,1));
+  for(int i=0;i<12;i++){ int ly=LY[i]+off; if(ly>=50) continue;
+    float b=0.45f+0.55f*sinf(t*0.006f + i*1.7f);                       // each light twinkles
+    CRGB c=PAL[(i + (int)(t/600))%4];                                  // colours cycle
+    fhPlot(LX[i],ly,c,fhClampf(b,0,1));
   }
 }
 
@@ -443,9 +446,14 @@ static void fhDrawLeaves(uint32_t t, float s){
     fhPlot((int)x,(int)fy, FH_TURN[(h>>2)%7], s);
   }
 }
-// landed leaves accumulate into little piles on the grass through autumn
+// landed leaves accumulate into little piles on the grass; they persist into winter
+// (the snow layer covers them) and fade out during the spring melt
 static void fhDrawLeafPiles(float p){
-  float acc=fhClampf((p-0.64f)/0.11f,0,1);
+  float acc;
+  if(p<0.64f) return;                                           // spring/summer: no piles
+  else if(p<0.75f)     acc=(p-0.64f)/0.11f;                     // accumulate over autumn
+  else if(p<FH_MELT0)  acc=1.0f;                                // hold through winter (snow buries them)
+  else                 acc=1.0f-fhSmooth((p-FH_MELT0)/(1.0f-FH_MELT0));  // fade out in the melt
   if(acc<=0.0f) return;
   static const uint8_t PX[27]={10,11,12,13,14, 19,20,21,22,23, 45,46,47,48,49, 11,12,13, 20,21,22, 46,47,48, 12,21,47};
   static const uint8_t PY[27]={56,56,56,56,56, 57,57,57,57,57, 56,56,56,56,56, 55,55,55, 56,56,56, 55,55,55, 54,55,54};
@@ -473,7 +481,7 @@ static void fhDrawWeather(float p){
       }
     }
   }
-  if(leavesS>0.05f){ fhDrawLeafPiles(p); fhDrawLeaves(t, leavesS); }
+  if(leavesS>0.05f) fhDrawLeaves(t, leavesS);   // airborne leaves (piles are drawn earlier, under the snow)
 }
 
 // =================== COMPOSITOR ===================
@@ -485,6 +493,7 @@ static void fhRender(float p){
   fhDrawWall(p);
   fhDrawHeroTree(p);
   fhDrawForeground(p);
+  fhDrawLeafPiles(p);      // leaf piles on the grass (drawn before snow so winter snow buries them)
   fhDrawSnow(p);
   fhDrawBarn(p);           // barn drawn over the snow (clean red walls, no skip-rectangle halo)
   fhDrawBarnWindow(p);
