@@ -173,11 +173,16 @@ static void fhDrawWood(float p){
       int bl=(int)lroundf(fhGround(ax));
       int start=top+2+(ax&1);
       for(int ty=start; ty+4<=bl; ty+=4){
-        int tx=ax+((ty&1)?1:0);
-        uint8_t seed=(uint8_t)(ax*3+ty);
-        fhPlot(tx,ty+1,CRGB(0x4A3318),1.0f);
-        fhPlot(tx,ty+2,CRGB(0x4A3318),1.0f);
-        if(amt>0.02f) fhDisc(tx,ty,2.3f*amt+0.3f, fhFoliage(p,seed));
+        uint32_t h=(uint32_t)(ax*374761393 + ty*668265263); h=(h^(h>>13))*1274126177u;
+        if((h&7)==0) continue;                       // scattered gaps (not a filled grid)
+        int tx =ax + ((int)(h&3)-1);                 // x jitter -1..+2
+        int tyj=ty + ((int)((h>>2)&3)-1);            // y jitter -1..+2
+        if(tyj<top || tyj+2>=bl) tyj=ty;             // keep the tree on the hill
+        uint8_t seed=(uint8_t)(ax*3+ty+(h>>4));
+        float rad=2.0f + ((h>>5)&7)/7.0f*0.9f;       // varied canopy size 2.0..2.9
+        fhPlot(tx,tyj+1,CRGB(0x4A3318),1.0f);
+        fhPlot(tx,tyj+2,CRGB(0x4A3318),1.0f);
+        if(amt>0.02f) fhDisc(tx,tyj, rad*amt+0.3f, fhFoliage(p,seed));
       }
     }
   }
@@ -241,10 +246,10 @@ static void fhGambrelRoof(CRGB c){
   }
 }
 static void fhDrawBarn(float p){
-  fhGambrelRoof(CRGB(0x8F97A1));                              // grey roof (snow cap added in winter)
-  for(int y=37;y<46;y++) fhFillRow(y,34,49,CRGB(0xBE3B2C));   // red body
-  for(int y=37;y<46;y++){ fhPlot(38,y,CRGB(0xB23528),1.0f); fhPlot(45,y,CRGB(0xB23528),1.0f); }
-  for(int y=40;y<46;y++) fhFillRow(y,38,44,CRGB(0x241006));   // open doorway (centred)
+  fhGambrelRoof(CRGB(0x8F97A1));                              // grey roof
+  for(int y=38;y<46;y++) fhFillRow(y,34,49,CRGB(0xBE3B2C));   // red body (1 row lower -> grey eave at y37 shows)
+  for(int y=38;y<46;y++){ fhPlot(38,y,CRGB(0xB23528),1.0f); fhPlot(45,y,CRGB(0xB23528),1.0f); }
+  for(int y=40;y<46;y++) fhFillRow(y,39,44,CRGB(0x241006));   // door, between the dark-red lines
 }
 
 // warm-lit central hayloft window in the gable; drawn over the snow so it stays lit in winter
