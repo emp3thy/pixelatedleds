@@ -30,6 +30,8 @@ static uint32_t lcRng        = 0x1234567u;
 static uint16_t lcRound      = 0;
 static int8_t   lcWinner     = -1;         // -1 none/draw, else cycle index
 static bool     lcInit       = false;
+static uint32_t lcRoundStart = 0;          // millis at round start (for burst timing)
+static uint16_t lcBurstDelay[LC_N];        // ms into the round each cycle fires its one 2s burst
 
 // per-cycle palette: trail / head / additive glow
 static const CRGB LC_TRAIL[LC_N] = {CRGB(0xE03030),CRGB(0x3060E0),CRGB(0x30C040),CRGB(0xE0B020)};
@@ -49,14 +51,22 @@ static void lcReset(){
   for(int y=0;y<NUM_ROWS;y++){ lcGrid[lcGi(0,y)]=LC_WALL; lcGrid[lcGi(NUM_COLS-1,y)]=LC_WALL; }
   lcRound++;
   lcRng = 0x9E3779B9u ^ ((uint32_t)lcRound*2654435761u); if(lcRng==0) lcRng=1;
-  int a=12+(int)(lcRand()%36), b=12+(int)(lcRand()%36);   // 12..47
-  int c=12+(int)(lcRand()%36), d=12+(int)(lcRand()%36);
-  lcCyc[0] = { 8,  (int8_t)a,  1,  0, true };   // left edge  -> right
-  lcCyc[1] = { 51, (int8_t)b, -1,  0, true };   // right edge -> left
-  lcCyc[2] = { (int8_t)c, 8,   0,  1, true };   // top edge   -> down
-  lcCyc[3] = { (int8_t)d, 51,  0, -1, true };   // bottom edge-> up
-  for(int i=0;i<LC_N;i++) lcGrid[lcGi(lcCyc[i].x,lcCyc[i].y)] = (uint8_t)(i+1);
+  const int MID = NUM_COLS/2;                    // 30
+  lcCyc[0] = { 8,   (int8_t)MID,  1,  0, true }; // WEST  (red)   -> east
+  lcCyc[1] = { 51,  (int8_t)MID, -1,  0, true }; // EAST  (blue)  -> west
+  lcCyc[2] = { (int8_t)MID, 8,    0,  1, true }; // NORTH (green) -> south
+  lcCyc[3] = { (int8_t)MID, 51,   0, -1, true }; // SOUTH (amber) -> north
+  for(int i=0;i<LC_N;i++){
+    lcGrid[lcGi(lcCyc[i].x,lcCyc[i].y)] = (uint8_t)(i+1);
+    lcBurstDelay[i] = 1500 + (uint16_t)(lcRand()%4000);   // each fires its 2s burst at a random time
+  }
+  lcRoundStart = millis();
   lcWinner = -1;
+}
+
+static inline bool lcBursting(int i){
+  uint32_t e = millis() - lcRoundStart;
+  return e >= lcBurstDelay[i] && e < (uint32_t)lcBurstDelay[i] + 2000;
 }
 
 // choose a move for cycle i (straight / left-turn / right-turn) that stays alive and
@@ -110,6 +120,16 @@ static void lcStep(){
     else { lcCyc[i].dx=ndx[i]; lcCyc[i].dy=ndy[i]; lcCyc[i].x=nx[i]; lcCyc[i].y=ny[i];
            lcGrid[lcGi(nx[i],ny[i])]=(uint8_t)(i+1); }
   }
+  // burst: a cycle in its 2-second window takes one EXTRA cell this step (~2x speed)
+  for(int i=0;i<LC_N;i++){
+    if(!lcCyc[i].alive || !lcBursting(i)) continue;
+    int8_t edx,edy;
+    if(lcChoose(i, edx,edy)){
+      int ex=lcCyc[i].x+edx, ey=lcCyc[i].y+edy;
+      if(lcGrid[lcGi(ex,ey)]==0){ lcCyc[i].dx=edx; lcCyc[i].dy=edy; lcCyc[i].x=ex; lcCyc[i].y=ey; lcGrid[lcGi(ex,ey)]=(uint8_t)(i+1); }
+      else lcCyc[i].alive=false;
+    } else lcCyc[i].alive=false;
+  }
   // race ends when <=1 cycle remains
   int n=0, last=-1; for(int i=0;i<LC_N;i++) if(lcCyc[i].alive){ n++; last=i; }
   if(n<=1){ lcWinner=(n==1)?(int8_t)last:-1; lcPhase=LC_FLASH; lcPhaseStart=millis(); }
@@ -134,9 +154,11 @@ static void lcRender(){
     const int8_t nb[4][2]={{1,0},{-1,0},{0,1},{0,-1}};
     for(int i=0;i<LC_N;i++){
       if(!lcCyc[i].alive) continue;
+      bool burst=lcBursting(i);
+      CRGB glow = burst ? (LC_GLOW[i] + LC_GLOW[i]) : LC_GLOW[i];   // brighter aura while bursting
       for(int k=0;k<4;k++){ int gx=lcCyc[i].x+nb[k][0], gy=lcCyc[i].y+nb[k][1];
-        if(gx>=0&&gx<NUM_COLS&&gy>=0&&gy<NUM_ROWS) leds[XY((uint8_t)gx,(uint8_t)gy)] += LC_GLOW[i]; }
-      leds[XY((uint8_t)lcCyc[i].x,(uint8_t)lcCyc[i].y)] = LC_HEAD[i];
+        if(gx>=0&&gx<NUM_COLS&&gy>=0&&gy<NUM_ROWS) leds[XY((uint8_t)gx,(uint8_t)gy)] += glow; }
+      leds[XY((uint8_t)lcCyc[i].x,(uint8_t)lcCyc[i].y)] = burst ? CRGB(0xFFFFFF) : LC_HEAD[i];
     }
   }
 }
