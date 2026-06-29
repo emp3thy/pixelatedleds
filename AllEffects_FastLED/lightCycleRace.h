@@ -14,7 +14,7 @@
 #define LC_FLASH_BLINK_MS 200     // winner pulse period
 #define LC_PAUSE_MS       500     // blank pause before next round
 #define LC_INTERCEPT_K    6       // how far ahead of the target the AI aims
-#define LC_N              4       // number of racers
+#define LC_N              8       // number of racers
 #define LC_WALL           250     // grid value for border walls (cycles are 1..LC_N)
 
 enum { LC_RACING=0, LC_FLASH=1, LC_PAUSE=2 };
@@ -34,9 +34,12 @@ static uint32_t lcRoundStart = 0;          // millis at round start (for burst t
 static uint16_t lcBurstDelay[LC_N];        // ms into the round each cycle fires its one 2s burst
 
 // per-cycle palette: trail / head / additive glow
-static const CRGB LC_TRAIL[LC_N] = {CRGB(0xE03030),CRGB(0x3060E0),CRGB(0x30C040),CRGB(0xE0B020)};
-static const CRGB LC_HEAD[LC_N]  = {CRGB(0xFFE0D8),CRGB(0xD8E4FF),CRGB(0xDFFFE0),CRGB(0xFFF4D0)};
-static const CRGB LC_GLOW[LC_N]  = {CRGB(0x401810),CRGB(0x101840),CRGB(0x103C18),CRGB(0x383010)};
+static const CRGB LC_TRAIL[LC_N] = {CRGB(0xE03030),CRGB(0x3060E0),CRGB(0x30C040),CRGB(0xE0B020),
+                                    CRGB(0xE040C0),CRGB(0x20C0D0),CRGB(0xE06020),CRGB(0x9050F0)};
+static const CRGB LC_HEAD[LC_N]  = {CRGB(0xFFE0D8),CRGB(0xD8E4FF),CRGB(0xDFFFE0),CRGB(0xFFF4D0),
+                                    CRGB(0xFFD8F4),CRGB(0xD8FAFF),CRGB(0xFFE0C8),CRGB(0xECD8FF)};
+static const CRGB LC_GLOW[LC_N]  = {CRGB(0x401810),CRGB(0x101840),CRGB(0x103C18),CRGB(0x383010),
+                                    CRGB(0x381030),CRGB(0x0E3438),CRGB(0x381808),CRGB(0x281040)};
 
 static inline uint32_t lcRand(){ lcRng^=lcRng<<13; lcRng^=lcRng>>17; lcRng^=lcRng<<5; return lcRng; }
 static inline int lcGi(int x,int y){ return y*NUM_COLS + x; }
@@ -51,12 +54,13 @@ static void lcReset(){
   for(int y=0;y<NUM_ROWS;y++){ lcGrid[lcGi(0,y)]=LC_WALL; lcGrid[lcGi(NUM_COLS-1,y)]=LC_WALL; }
   lcRound++;
   lcRng = 0x9E3779B9u ^ ((uint32_t)lcRound*2654435761u); if(lcRng==0) lcRng=1;
-  const int MID = NUM_COLS/2;                    // 30
-  lcCyc[0] = { 8,   (int8_t)MID,  1,  0, true }; // WEST  (red)   -> east
-  lcCyc[1] = { 51,  (int8_t)MID, -1,  0, true }; // EAST  (blue)  -> west
-  lcCyc[2] = { (int8_t)MID, 8,    0,  1, true }; // NORTH (green) -> south
-  lcCyc[3] = { (int8_t)MID, 51,   0, -1, true }; // SOUTH (amber) -> north
+  // 8 racers, 2 per side, starting at the very edge (just inside the wall) facing inward
+  static const int8_t LC_START[LC_N][4] = {
+    { 1,20, 1, 0}, {58,40,-1, 0}, {20, 1, 0, 1}, {40,58, 0,-1},   // W, E, N, S
+    { 1,40, 1, 0}, {58,20,-1, 0}, {40, 1, 0, 1}, {20,58, 0,-1}    // W, E, N, S (offset)
+  };
   for(int i=0;i<LC_N;i++){
+    lcCyc[i] = { LC_START[i][0], LC_START[i][1], LC_START[i][2], LC_START[i][3], true };
     lcGrid[lcGi(lcCyc[i].x,lcCyc[i].y)] = (uint8_t)(i+1);
     lcBurstDelay[i] = 1500 + (uint16_t)(lcRand()%4000);   // each fires its 2s burst at a random time
   }
