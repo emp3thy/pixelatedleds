@@ -27,8 +27,8 @@
     <div class="panel">
       <div class="ctl">
         <label>Pattern <span class="name" id="patName">0</span></label>
-        <input type="range" id="pattern" min="0" max="1140" step="57" value="0">
-        <div class="row"><span>0</span><span id="patVal">0</span><span>20</span></div>
+        <input type="range" id="pattern" min="0" max="1197" step="57" value="0">
+        <div class="row"><span>0</span><span id="patVal">0</span><span>21</span></div>
       </div>
       <div class="ctl">
         <label>Brightness gain <span id="gainVal">3.0×</span></label>
@@ -37,6 +37,10 @@
       <div class="ctl">
         <label>Pixel size <span id="cellVal">10px</span></label>
         <input type="range" id="cell" min="4" max="18" step="1" value="10">
+      </div>
+      <div class="ctl">
+        <label>Diffusion (PETG blur) <span id="diffVal">0.8×</span></label>
+        <input type="range" id="diff" min="0" max="2.5" step="0.1" value="0.8">
       </div>
       <div class="pill" id="fps">fps —</div>
       <div id="log"></div>
@@ -52,7 +56,7 @@
   const NAMES = ['pride','pacifica','metaBalls','fire','juggle','sinelon','rainbow','justWhite',
                  'palette fade','rain','confetti','bpm','rainbow+glitter',
                  'mondrian','plasma','aurora','voronoi',
-                 'water lilies','kusama dots','ocean sunrise','jusBlack (off)'];
+                 'water lilies','kusama dots','ocean sunrise','farmhouse seasons','jusBlack (off)'];
 
   // --- UI manifest capture (C++ pushes component list here) ---
   let sliderId = null;
@@ -94,7 +98,7 @@
   const getStripPixelData= Module.cwrap('getStripPixelData', 'number', ['number','number']);
   const getScreenMapData = Module.cwrap('getScreenMapData', 'number', ['number']);
   const processUiInput   = Module.cwrap('processUiInput', null, ['string']);
-  const SLIDER_NAME      = 'Pattern (0-20)';   // UISlider name; UI manager matches by name
+  const SLIDER_NAME      = 'Pattern (0-21)';   // UISlider name; UI manager matches by name
 
   const readJson = (getter) => {
     const sizePtr = Module._malloc(4);
@@ -132,11 +136,13 @@
   const patEl = document.getElementById('pattern');
   const gainEl = document.getElementById('gain');
   const cellEl = document.getElementById('cell');
+  const diffEl = document.getElementById('diff');
+  const diffValEl = document.getElementById('diffVal');
   const patVal = document.getElementById('patVal'), patName = document.getElementById('patName');
   const gainValEl = document.getElementById('gainVal'), cellValEl = document.getElementById('cellVal');
   const fpsEl = document.getElementById('fps');
-  let pendingUi = null, gain = 3, cell = 10;
-  const idx = v => Math.min(20, Math.round(v / 57));
+  let pendingUi = null, gain = 3, cell = 10, diff = 0.8;
+  const idx = v => Math.min(21, Math.round(v / 57));
   function onPattern() {
     const v = +patEl.value;
     patVal.textContent = v; patName.textContent = idx(v) + ' · ' + NAMES[idx(v)];
@@ -144,11 +150,15 @@
   }
   patEl.addEventListener('input', onPattern);
   gainEl.addEventListener('input', () => { gain = +gainEl.value; gainValEl.textContent = gain.toFixed(1)+'×'; });
-  cellEl.addEventListener('input', () => { cell = +cellEl.value; cellValEl.textContent = cell+'px'; resize(); });
+  cellEl.addEventListener('input', () => { cell = +cellEl.value; cellValEl.textContent = cell+'px'; resize(); applyDiff(); });
+  diffEl.addEventListener('input', () => { diff = +diffEl.value; diffValEl.textContent = diff.toFixed(1)+'×'; applyDiff(); });
   onPattern();
 
   const cv = document.getElementById('screen'), ctx = cv.getContext('2d');
   function resize() { cv.width = W * cell; cv.height = H * cell; }
+  // sim-only: blur the displayed panel to mimic light bleeding through the diffusing PETG
+  function applyDiff() { cv.style.filter = diff > 0 ? 'blur(' + (diff * cell) + 'px)' : 'none'; }
+  applyDiff();
 
   function applyPendingUi() {
     if (pendingUi === null) return;

@@ -28,13 +28,14 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 #include "waterLilies.h"
 #include "kusamaDots.h"
 #include "oceanSunrise.h"
+#include "farmhouseSeasons.h"
 //end patterns
 
 // --- WASM-sim-only additions (not part of the Teensy/FastLED-3.3.3 build) ---
 // On-screen slider replaces the hardware potentiometer. 0..1023 mirrors the
 // analogRead() range; step 57 = one notch per pattern (convertToSelectedEffect
 // divides by 57). Drag it in the browser to cycle all patterns.
-fl::UISlider effectSlider("Pattern (0-20)", 0, 0, 1140, 57);
+fl::UISlider effectSlider("Pattern (0-21)", 0, 0, 1197, 57);
 
 // WASM-sim-only export stub. The FastLED wasm linker is configured to export
 // `sim_set_pattern`, so the symbol must exist for the sim to link; it's a
@@ -93,6 +94,9 @@ void loop()
       break;
     case 25:
       oceanSunrise();
+      break;
+    case 26:
+      farmhouseSeasons();
       break;
     default:
       break;
