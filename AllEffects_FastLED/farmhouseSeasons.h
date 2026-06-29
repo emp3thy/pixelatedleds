@@ -234,7 +234,7 @@ static void fhDrawField(float p){
 static void fhGambrelRoof(CRGB c){
   for(int y=31;y<=37;y++){
     float L,R;
-    if(y<34){ float hw=(y-31)*2.0f; L=42-hw; R=42+hw; }
+    if(y<34){ float hw=(y-31)*2.0f; if(hw<0.5f) hw=0.5f; L=42-hw; R=42+hw; }  // min width so the ridge apex paints
     else    { float k=(y-34);       L=36-k;  R=48+k;  }
     for(int x=(int)floorf(L);x<=(int)ceilf(R);x++){
       float cov=fhClampf(min((float)x+1,R)-max((float)x,L),0,1);
