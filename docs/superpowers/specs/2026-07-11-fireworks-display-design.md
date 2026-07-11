@@ -65,7 +65,7 @@ A single global fade constant would make peony and willow look identical, so:
 | 5 | Crossette | 5 | med | 0.6 s + pop | comets that each split into 3-4 small stars |
 | 6 | Ring | 16 | no | 1.0 s | uniform expanding circle, contrasting pistil |
 | 7 | Strobe | 14 | no | 4.0 s | white/silver, slow drift, per-star 3-8 Hz blink |
-| 8 | Salute | 0 | no | 0.15 s | 7 px white flash disc, instant black after |
+| 8 | Salute | 0 | no | 0.4 s | 7 px white disc, blooms bright then fades quickly (no hard flash) |
 
 Ground-level: **mine** (fan of 8 short tailed stars from bottom edge, no rise),
 **comet** (rise + fade, no burst) as punctuation, and **fountain** (continuous
