@@ -76,7 +76,7 @@ struct FwPending {          // scheduled launch (break time worked backwards)
   uint16_t pauseMs;
 };
 
-struct FwSalute { bool active; float x, y; int32_t until; };
+struct FwSalute { bool active; float x, y; int32_t start, until; };
 struct FwBurstRec { float x; int32_t until; };   // for concurrency/spacing
 struct FwFountain { bool active; float x; int32_t until; };
 #define FW_MAX_FOUNTAINS 2
@@ -120,7 +120,7 @@ static const CRGB FW_C_BG     = CRGB(0x14, 0x1C, 0x34);  // survives global scal
 
 // nominal star life per type (ms) — used for burst-occupancy bookkeeping
 static const uint16_t FW_LIFE_MS[9] =
-  {1000, 1500, 1800, 4500, 2000, 1300, 1000, 3000, 200};
+  {1000, 1500, 1800, 4500, 2000, 1300, 1000, 3000, 400};
 
 static inline uint32_t fwRand() {
   fwRng ^= fwRng << 13; fwRng ^= fwRng >> 17; fwRng ^= fwRng << 5; return fwRng;
@@ -266,11 +266,11 @@ static void fwBurst(float x, float y, uint8_t type, CRGB col, CRGB col2, int32_t
                     3.0f * fwJit(), 0, FW_SF_STROBE, 0.25f, 0);
       }
       break;
-    case FW_SALUTE:      // 7 px white flash disc, instant black after
+    case FW_SALUTE:      // 7 px white disc, fast bloom then quick fade
       for (int i = 0; i < FW_MAX_SALUTES; i++) {
         if (fwSalutes[i].active) continue;
         fwSalutes[i].active = true; fwSalutes[i].x = x; fwSalutes[i].y = y;
-        fwSalutes[i].until = showMs + 130;
+        fwSalutes[i].start = showMs; fwSalutes[i].until = showMs + 380;
         break;
       }
       break;
@@ -495,7 +495,7 @@ static void fwSchedule(int32_t showMs) {
             fwSalutes[i].active = true;
             fwSalutes[i].x = (float)fwRandI(8, 51);
             fwSalutes[i].y = (float)fwRandI(10, 18);
-            fwSalutes[i].until = showMs + 130;
+            fwSalutes[i].start = showMs; fwSalutes[i].until = showMs + 380;
             break;
           }
           fwNextB += fwRandI(250, 400);
@@ -646,15 +646,18 @@ void fireworks() {
     fwPlot((int)(sh.x + 0.5f), (int)(sh.y + 0.5f), CRGB(255, 214, 140));
   }
 
-  // salute flash discs (2 frames, then instant black)
+  // salute discs: appear bright, then fade out quickly — no hard flash
   for (int i = 0; i < FW_MAX_SALUTES; i++) {
     FwSalute& sa = fwSalutes[i];
     if (!sa.active) continue;
     if (showMs >= sa.until) { sa.active = false; continue; }
+    float t = (float)(showMs - sa.start) / (float)(sa.until - sa.start);
+    CRGB c = CRGB(255, 250, 240);
+    c.nscale8_video((uint8_t)((1.0f - t) * (1.0f - t) * 255.0f));
     int cx = (int)(sa.x + 0.5f), cy = (int)(sa.y + 0.5f);
     for (int dy = -3; dy <= 3; dy++)
       for (int dx = -3; dx <= 3; dx++)
-        if (dx * dx + dy * dy <= 12) fwPlot(cx + dx, cy + dy, CRGB(255, 250, 240));
+        if (dx * dx + dy * dy <= 12) fwPlot(cx + dx, cy + dy, c);
   }
 
   FastLED.show();
