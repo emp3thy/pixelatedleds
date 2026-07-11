@@ -45,8 +45,9 @@ A single global fade constant would make peony and willow look identical, so:
 - `static FwStar stars[FW_MAX_STARS]` (160): `x, y, vx, vy` (float), `hue/colour`,
   `age, life` (ms), `type` flags (trailed, strobe, gravity multiplier, secondary-
   break countdown for crossette).
-- `static FwShell shells[FW_MAX_SHELLS]` (6): rising rockets — `x, y, vy`,
-  `burstType, burstY, colour`. Rise ~1.0-1.5 s, decelerating under gravity;
+- `static FwShell shells[FW_MAX_SHELLS]` (12): rising rockets — `x, y, vx, vy`,
+  `burstType, burstY, colour`. Rise ~1.0-1.5 s, decelerating under gravity, with
+  a random +/- ~3 degree launch-angle tilt off vertical so ascents vary;
   100-200 ms dark apex pause before break (the key realism cue).
 - Physics (px/s units): gravity g = 10 px/s² (stars), drag ×~0.92 per 50 ms
   (exp decay); star ejection v0 = 25-45 px/s giving terminal burst radius 6-14 px;
@@ -66,8 +67,10 @@ A single global fade constant would make peony and willow look identical, so:
 | 7 | Strobe | 14 | no | 4.0 s | white/silver, slow drift, per-star 3-8 Hz blink |
 | 8 | Salute | 0 | no | 0.15 s | 7 px white flash disc, instant black after |
 
-Ground-level: **mine** (fan of 8 short tailed stars from bottom edge, no rise) and
-**comet** (rise + fade, no burst) as punctuation.
+Ground-level: **mine** (fan of 8 short tailed stars from bottom edge, no rise),
+**comet** (rise + fade, no burst) as punctuation, and **fountain** (continuous
+gold spark spray from a fixed bottom-edge point, ~3 s) — opens the show and
+bridges phase seams so the sky is never dead outside the lull/stop.
 
 ## Colour doctrine
 
@@ -83,7 +86,7 @@ only. Finale converges on gold + white.
 |-------|-----|---------|---------|
 | OPENER | 6 s | 3-4 launches in first 2 s, then 1/1.5 s | comets + mines, then red/gold/silver peonies & dahlias |
 | VOLLEYS | 15 s | 1 per 2-3 s, occasional mirrored 2-shell volley | peonies, chrysanthemums, one ring |
-| GOLD | 14 s | 1 per 4-5 s, never overlapping | willows solo centre-sky, palms, ground comets |
+| GOLD | 14 s | 1 per 4-5 s, at most two alight, staggered | willows solo centre-sky, palms, ground comets |
 | RHYTHM | 15 s | metronomic 1 per 1.7 s alternating low mine / high break | crossettes, rings, strobe, dahlias |
 | LULL | 5 s | 2.5 s black sky, then a single slow gold willow | suspense before finale |
 | FINALE | 14 s | ramp 1/s → 3/s, full width, cap lifted | dahlias + chrysanthemums + willows stacked, last 2 s salutes only |
