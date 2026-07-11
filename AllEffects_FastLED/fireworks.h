@@ -429,6 +429,7 @@ static void fwSchedule(int32_t showMs) {
       } else {
         uint8_t ty = (fwRand() & 1) ? FW_PEONY : FW_CHRYS;
         CRGB c = fwVolleyColour();
+        if (c.r < 100 && c.b == 255) ty = FW_PEONY;   // blue accent: crisp + small, never a big trailed chrys
         fwQueueShell(fwNextB, fwPickX(8, 51, showMs), ty, (float)fwRandI(12, 20), c, c);
       }
       fwNextB += fwRandI(2000, 3000);
@@ -505,7 +506,7 @@ static void fwSchedule(int32_t showMs) {
         static const uint8_t seq[3] = {FW_DAHLIA, FW_CHRYS, FW_WILLOW};
         uint8_t ty = seq[fwRand() % 3];
         CRGB c;                                          // converge on gold + white
-        if (f > 0.4f) c = (fwRand() & 1) ? FW_C_GOLD : FW_C_WHITE;
+        if (f > 0.25f) c = (fwRand() & 1) ? FW_C_GOLD : FW_C_WHITE;
         else c = fwVolleyColour(true);                   // no blue in the finale
         fwQueueShell(fwNextB, (float)fwRandI(6, 53), ty,
                      (float)((ty == FW_WILLOW) ? fwRandI(13, 18) : fwRandI(10, 18)), c, c);
