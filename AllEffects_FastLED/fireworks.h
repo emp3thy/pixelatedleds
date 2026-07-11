@@ -15,8 +15,8 @@
 
 // ---- pools & physics ----
 #define FW_MAX_STARS   160
-#define FW_MAX_SHELLS  6
-#define FW_MAX_PEND    10
+#define FW_MAX_SHELLS  12
+#define FW_MAX_PEND    16
 #define FW_MAX_SALUTES 4
 #define FW_MAX_BURSTS  6
 #define FW_G           10.0f    // star gravity px/s^2
@@ -59,7 +59,7 @@ struct FwStar {
 struct FwShell {
   bool     active;
   uint8_t  state;           // 0 rising, 1 apex pause (dark)
-  float    x, y, vy;
+  float    x, y, vx, vy;    // vx: slight random launch-angle tilt off vertical
   float    burstY;
   uint8_t  type;
   CRGB     col, col2;
@@ -78,13 +78,21 @@ struct FwPending {          // scheduled launch (break time worked backwards)
 
 struct FwSalute { bool active; float x, y; int32_t until; };
 struct FwBurstRec { float x; int32_t until; };   // for concurrency/spacing
+struct FwFountain { bool active; float x; int32_t until; };
+#define FW_MAX_FOUNTAINS 2
+#define FW_N_FOUNT_CUES  3
 
 static FwStar     fwStars[FW_MAX_STARS];
 static FwShell    fwShells[FW_MAX_SHELLS];
 static FwPending  fwPend[FW_MAX_PEND];
 static FwSalute   fwSalutes[FW_MAX_SALUTES];
 static FwBurstRec fwBursts[FW_MAX_BURSTS];
+static FwFountain fwFounts[FW_MAX_FOUNTAINS];
 static CRGB       fwTrail[NUM_LEDS];      // persistent trail buffer
+
+// ground fountains: settle the audience at show open, bridge phase seams
+static const int32_t FW_FOUNT_CUES[FW_N_FOUNT_CUES][2] =
+  {{0, 3000}, {6200, 2800}, {21200, 3300}};   // {start ms, duration ms}
 
 static bool     fwInitDone   = false;
 static uint32_t fwLastMs     = 0;
@@ -96,6 +104,7 @@ static uint8_t  fwCntA       = 0;
 static uint8_t  fwCntB       = 0;
 static bool     fwRingDone   = false;
 static bool     fwLullFired  = false;
+static uint8_t  fwFountIdx   = 0;   // next fountain cue
 static uint32_t fwRng        = 0xC0FFEE21u;
 
 // ---- chemistry palette ----
@@ -107,11 +116,11 @@ static const CRGB FW_C_SILVER = CRGB(196, 208, 228);
 static const CRGB FW_C_PURPLE = CRGB(184, 40, 255);  // rare accent
 static const CRGB FW_C_BLUE   = CRGB( 48, 88, 255);  // rare accent (reads badly)
 static const CRGB FW_C_EMBER  = CRGB( 60, 20, 0);    // end-of-life shift target
-static const CRGB FW_C_BG     = CRGB(0x0A, 0x0E, 0x1A);
+static const CRGB FW_C_BG     = CRGB(0x14, 0x1C, 0x34);  // survives global scaling
 
 // nominal star life per type (ms) — used for burst-occupancy bookkeeping
 static const uint16_t FW_LIFE_MS[9] =
-  {1000, 1500, 1800, 4500, 2000, 1300, 1000, 4000, 200};
+  {1000, 1500, 1800, 4500, 2000, 1300, 1000, 3000, 200};
 
 static inline uint32_t fwRand() {
   fwRng ^= fwRng << 13; fwRng ^= fwRng >> 17; fwRng ^= fwRng << 5; return fwRng;
@@ -172,7 +181,7 @@ static void fwMine(float x, CRGB col) {
     float ang = -FW_TWO_PI / 4.0f + ((float)i / 7.0f - 0.5f) * 1.2f;
     float v = (38.0f + fwRandF() * 14.0f);
     fwSpawnStar(x, FW_GROUND_Y, cosf(ang) * v, sinf(ang) * v,
-                col, col, 0.75f * fwJit(), 210, 0, 1.0f, 0);
+                col, col, 1.0f * fwJit(), 210, 0, 1.0f, 0);
   }
 }
 
@@ -182,19 +191,34 @@ static void fwComet(float x, CRGB col) {
               col, col, 1.2f * fwJit(), 255, FW_SF_FAT, 2.5f, 0);
 }
 
+// fountain: continuous gold spark spray from a fixed bottom-edge point
+static void fwUpdateFountains(int32_t showMs) {
+  for (int i = 0; i < FW_MAX_FOUNTAINS; i++) {
+    FwFountain& f = fwFounts[i];
+    if (!f.active) continue;
+    if (showMs >= f.until) { f.active = false; continue; }
+    for (int k = 0; k < 2; k++) {              // 2 sparks per frame (~40/s)
+      CRGB c = (fwRand() % 100 < 20) ? FW_C_WHITE : FW_C_GOLD;
+      fwSpawnStar(f.x + (fwRandF() - 0.5f) * 1.5f, FW_GROUND_Y,
+                  (fwRandF() - 0.5f) * 12.0f, -(18.0f + fwRandF() * 16.0f),
+                  c, c, 0.4f + fwRandF() * 0.4f, 140, 0, 1.0f, 0);
+    }
+  }
+}
+
 static void fwBurst(float x, float y, uint8_t type, CRGB col, CRGB col2, int32_t showMs) {
   float base = fwRandF() * FW_TWO_PI;
   switch (type) {
     case FW_PEONY:       // 18 uniform radial, single colour, crisp
       for (int i = 0; i < 18; i++) {
-        float a = base + FW_TWO_PI * i / 18.0f, v = 30.0f * fwJit();
+        float a = base + FW_TWO_PI * i / 18.0f, v = 40.0f * fwJit();
         fwSpawnStar(x, y, cosf(a) * v, sinf(a) * v, col, col, 1.0f * fwJit(), 0, 0, 1.0f, 0);
       }
       break;
     case FW_CHRYS:       // peony + silver-tinged persistent trails
       for (int i = 0; i < 18; i++) {
-        float a = base + FW_TWO_PI * i / 18.0f, v = 30.0f * fwJit();
-        CRGB tc = blend(col, FW_C_SILVER, 110);
+        float a = base + FW_TWO_PI * i / 18.0f, v = 40.0f * fwJit();
+        CRGB tc = blend(col, FW_C_SILVER, 150);
         fwSpawnStar(x, y, cosf(a) * v, sinf(a) * v, col, tc, 1.5f * fwJit(), 210, 0, 1.0f, 0);
       }
       break;
@@ -228,19 +252,18 @@ static void fwBurst(float x, float y, uint8_t type, CRGB col, CRGB col2, int32_t
     case FW_RING:        // uniform expanding circle (no jitter) + pistil
       for (int i = 0; i < 16; i++) {
         float a = base + FW_TWO_PI * i / 16.0f;
-        fwSpawnStar(x, y, cosf(a) * 30.0f, sinf(a) * 30.0f, col, col, 1.0f, 0, 0, 1.0f, 0);
+        fwSpawnStar(x, y, cosf(a) * 38.0f, sinf(a) * 38.0f, col, col, 1.0f, 0, 0, 1.0f, 0);
       }
       for (int i = 0; i < 5; i++) {
         float a = fwRandF() * FW_TWO_PI, v = 7.0f * fwJit();
         fwSpawnStar(x, y, cosf(a) * v, sinf(a) * v, col2, col2, 0.9f * fwJit(), 0, 0, 1.0f, 0);
       }
       break;
-    case FW_STROBE:      // white/silver, slow drift, per-star 3-8 Hz blink
-      for (int i = 0; i < 14; i++) {
-        float a = base + FW_TWO_PI * i / 14.0f, v = 13.0f * fwJit();
-        CRGB c = (fwRand() & 1) ? FW_C_WHITE : FW_C_SILVER;
-        fwSpawnStar(x, y, cosf(a) * v, sinf(a) * v, c, c,
-                    4.0f * fwJit(), 0, FW_SF_STROBE, 0.25f, 0);
+    case FW_STROBE:      // white, slow drift, per-star 3-8 Hz blink
+      for (int i = 0; i < 20; i++) {
+        float a = base + FW_TWO_PI * i / 20.0f, v = 13.0f * fwJit();
+        fwSpawnStar(x, y, cosf(a) * v, sinf(a) * v, FW_C_WHITE, FW_C_WHITE,
+                    3.0f * fwJit(), 0, FW_SF_STROBE, 0.25f, 0);
       }
       break;
     case FW_SALUTE:      // 7 px white flash disc, instant black after
@@ -252,7 +275,9 @@ static void fwBurst(float x, float y, uint8_t type, CRGB col, CRGB col2, int32_t
       }
       break;
   }
-  fwRecordBurst(x, showMs, FW_LIFE_MS[type]);
+  // record at 60% of nominal life: long pieces (willow/strobe) must not starve
+  // the air-count gate once their stars are already dim
+  fwRecordBurst(x, showMs, (uint16_t)((FW_LIFE_MS[type] * 3) / 5));
 }
 
 // ---- scheduler helpers (break time cued, launch worked backwards) ----
@@ -310,6 +335,7 @@ static void fwPopPending(int32_t showMs) {
       if (sh.active) continue;
       sh.active = true; sh.state = 0;
       sh.x = p.x; sh.y = FW_GROUND_Y; sh.vy = p.vy0;
+      sh.vx = -p.vy0 * (fwRandF() - 0.5f) * 0.10f;   // +/- ~3 deg off vertical
       sh.burstY = p.burstY; sh.type = p.type;
       sh.col = p.col; sh.col2 = p.col2;
       sh.pauseMs = p.pauseMs; sh.pauseEnd = 0;
@@ -319,13 +345,13 @@ static void fwPopPending(int32_t showMs) {
   }
 }
 
-static CRGB fwVolleyColour() {   // saturated singles; purple/blue rare accents
+static CRGB fwVolleyColour(bool noBlue = false) {   // saturated singles; purple/blue rare
   uint32_t r = fwRand() % 100;
   if (r < 30) return FW_C_RED;
   if (r < 60) return FW_C_GREEN;
   if (r < 84) return FW_C_GOLD;
   if (r < 94) return FW_C_PURPLE;
-  return FW_C_BLUE;
+  return noBlue ? FW_C_GOLD : FW_C_BLUE;
 }
 
 static void fwSchedule(int32_t showMs) {
@@ -337,10 +363,22 @@ static void fwSchedule(int32_t showMs) {
   else if (showMs < FW_T_LULL_END)    ph = FW_PH_LULL;
   else if (showMs < FW_T_FINALE_END)  ph = FW_PH_FINALE;
 
+  // ground fountains fire on their cue regardless of phase
+  if (fwFountIdx < FW_N_FOUNT_CUES && showMs >= FW_FOUNT_CUES[fwFountIdx][0]) {
+    for (int i = 0; i < FW_MAX_FOUNTAINS; i++) {
+      if (fwFounts[i].active) continue;
+      fwFounts[i].active = true;
+      fwFounts[i].x = (float)fwRandI(18, 41);
+      fwFounts[i].until = showMs + FW_FOUNT_CUES[fwFountIdx][1];
+      break;
+    }
+    fwFountIdx++;
+  }
+
   if (ph != fwPhase) {                        // phase entry
     fwPhase = ph; fwCntA = 0; fwCntB = 0;
     switch (ph) {
-      case FW_PH_OPENER:  fwNextA = 200;   fwNextB = 2600;  break;
+      case FW_PH_OPENER:  fwNextA = 200;   fwNextB = 1800;  break;
       case FW_PH_VOLLEYS: fwNextB = FW_T_OPENER_END + 1500; break;
       case FW_PH_GOLD:    fwNextB = FW_T_VOLLEYS_END + 1000;
                           fwNextA = FW_T_VOLLEYS_END + 2200; break;
@@ -361,19 +399,19 @@ static void fwSchedule(int32_t showMs) {
       }
       // then red/gold/silver peonies & dahlias, 1 per 1.5 s
       if (fwNextB < FW_T_OPENER_END + 500 && showMs >= fwNextB - FW_MAX_LEAD_MS) {
-        if (fwCountAir(showMs) >= 2) { fwNextB += 400; break; }
+        if (fwCountAir(showMs) >= 2) { fwNextB += 150; break; }
         static const CRGB oc[3] = {FW_C_RED, FW_C_GOLD, FW_C_SILVER};
         uint8_t ty = (fwCntB & 1) ? FW_DAHLIA : FW_PEONY;
         float by = (float)((ty == FW_DAHLIA) ? fwRandI(10, 16) : fwRandI(12, 20));
         fwQueueShell(fwNextB, fwPickX(10, 49, showMs), ty, by, oc[fwCntB % 3], oc[fwCntB % 3]);
-        fwNextB += 1500; fwCntB++;
+        fwNextB += 1100; fwCntB++;
       }
       break;
     }
     case FW_PH_VOLLEYS: {
       if (fwNextB >= FW_T_VOLLEYS_END - 500 || showMs < fwNextB - FW_MAX_LEAD_MS) break;
       int air = fwCountAir(showMs);
-      if (air >= 2) { fwNextB += 400; break; }
+      if (air >= 2) { fwNextB += 150; break; }
       bool mirrored = (air == 0) && (fwRand() % 100 < 25);
       if (mirrored) {                          // complementary-pair volley
         bool rg = (fwRand() & 1);
@@ -403,7 +441,7 @@ static void fwSchedule(int32_t showMs) {
         fwNextA += fwRandI(3000, 4500);
       }
       if (fwNextB >= FW_T_GOLD_END - 1000 || showMs < fwNextB - FW_MAX_LEAD_MS) break;
-      if (fwCountAir(showMs) >= 1) { fwNextB += 500; break; }   // never overlapping
+      if (fwCountAir(showMs) >= 2) { fwNextB += 150; break; }   // at most two alight, staggered
       if (fwCntB & 1) {                        // palm, gold or silver
         CRGB c = (fwRand() % 100 < 40) ? FW_C_SILVER : FW_C_GOLD;
         fwQueueShell(fwNextB, fwPickX(10, 49, showMs), FW_PALM, (float)fwRandI(16, 22), c, c);
@@ -432,8 +470,10 @@ static void fwSchedule(int32_t showMs) {
           CRGB p = (ty == FW_RING) ? ((c.g > 128) ? FW_C_RED : FW_C_GOLD) : c;
           fwQueueShell(fwNextB, fwPickX(8, 51, showMs), ty,
                        (float)((ty == FW_DAHLIA) ? fwRandI(10, 16) : fwRandI(14, 24)), c, p);
+          fwNextB += 1700; fwCntB++;           // advance only when the beat fired
+        } else if (showMs - fwNextB > 1700) {  // a full beat behind: re-anchor
+          fwNextB += 1700;
         }
-        fwNextB += 1700; fwCntB++;             // keep the metronome even if skipped
       }
       break;
     }
@@ -447,18 +487,26 @@ static void fwSchedule(int32_t showMs) {
       break;
     }
     case FW_PH_FINALE: {
-      if (fwNextB >= FW_T_FINALE_END || showMs < fwNextB - FW_MAX_LEAD_MS) break;
-      if (fwNextB >= FW_T_FINALE_END - 2000) {           // last 2 s: salutes only
-        fwQueueShell(fwNextB, (float)fwRandI(8, 51), FW_SALUTE, (float)fwRandI(10, 16),
-                     FW_C_WHITE, FW_C_WHITE);
-        fwNextB += fwRandI(250, 400);
+      if (fwNextB >= FW_T_FINALE_END - 400 || showMs < fwNextB - FW_MAX_LEAD_MS) break;
+      if (fwNextB >= FW_T_FINALE_END - 2000) {           // last 2 s: salutes only,
+        if (showMs >= fwNextB) {                         // fired direct — no rise,
+          for (int i = 0; i < FW_MAX_SALUTES; i++) {     // real salutes are reports
+            if (fwSalutes[i].active) continue;
+            fwSalutes[i].active = true;
+            fwSalutes[i].x = (float)fwRandI(8, 51);
+            fwSalutes[i].y = (float)fwRandI(10, 18);
+            fwSalutes[i].until = showMs + 130;
+            break;
+          }
+          fwNextB += fwRandI(250, 400);
+        }
       } else {                                           // ramp 1/s -> 3/s, cap lifted
         float f = (float)(fwNextB - FW_T_LULL_END) / (float)(FW_T_FINALE_END - FW_T_LULL_END);
         static const uint8_t seq[3] = {FW_DAHLIA, FW_CHRYS, FW_WILLOW};
         uint8_t ty = seq[fwRand() % 3];
         CRGB c;                                          // converge on gold + white
-        if (fwRandF() < f * 0.9f) c = (fwRand() & 1) ? FW_C_GOLD : FW_C_WHITE;
-        else c = fwVolleyColour();
+        if (f > 0.4f) c = (fwRand() & 1) ? FW_C_GOLD : FW_C_WHITE;
+        else c = fwVolleyColour(true);                   // no blue in the finale
         fwQueueShell(fwNextB, (float)fwRandI(6, 53), ty,
                      (float)((ty == FW_WILLOW) ? fwRandI(13, 18) : fwRandI(10, 18)), c, c);
         fwNextB += (int32_t)(1000.0f - 667.0f * f);
@@ -477,6 +525,7 @@ static void fwUpdateShells(float dt, int32_t showMs) {
     if (!sh.active) continue;
     if (sh.state == 0) {                       // rising
       sh.vy += FW_SHELL_G * dt;
+      sh.x  += sh.vx * dt;
       sh.y  += sh.vy * dt;
       if (sh.y <= sh.burstY || sh.vy >= -4.0f) {   // apex: go dark, then break
         sh.state = 1;
@@ -523,8 +572,9 @@ static void fwReset(uint32_t now) {
   for (int i = 0; i < FW_MAX_PEND; i++)    fwPend[i].active = false;
   for (int i = 0; i < FW_MAX_SALUTES; i++) fwSalutes[i].active = false;
   for (int i = 0; i < FW_MAX_BURSTS; i++)  { fwBursts[i].x = -100.0f; fwBursts[i].until = 0; }
+  for (int i = 0; i < FW_MAX_FOUNTAINS; i++) fwFounts[i].active = false;
   for (int i = 0; i < NUM_LEDS; i++)       fwTrail[i] = CRGB::Black;
-  fwPhase = -1; fwRingDone = false; fwLullFired = false;
+  fwPhase = -1; fwRingDone = false; fwLullFired = false; fwFountIdx = 0;
   fwShowStart = now; fwLastMs = now;
   fwRng = 0x9E3779B9u ^ now; if (fwRng == 0) fwRng = 1;
 }
@@ -533,7 +583,9 @@ static void fwReset(uint32_t now) {
 
 void fireworks() {
   uint32_t now = millis();
-  if (!fwInitDone || now - fwLastMs > 1000) fwReset(now);   // fresh start on (re)entry
+  if (!fwInitDone) fwReset(now);
+  else if (now - fwLastMs > 1000)              // stutter or re-entry: pause the
+    fwShowStart += now - fwLastMs;             // show clock, never reset mid-show
   float dt = (float)(now - fwLastMs) * 0.001f;
   if (dt > 0.1f) dt = 0.1f;                                  // clamp to 100 ms
   fwLastMs = now;
@@ -541,13 +593,15 @@ void fireworks() {
   int32_t showMs = (int32_t)(now - fwShowStart);
   if (showMs >= FW_SHOW_LEN) {                               // loop the programme
     fwShowStart = now; showMs = 0;
-    fwPhase = -1; fwRingDone = false; fwLullFired = false;
-    for (int i = 0; i < FW_MAX_PEND; i++)   fwPend[i].active = false;
-    for (int i = 0; i < FW_MAX_BURSTS; i++) fwBursts[i].until = 0;
+    fwPhase = -1; fwRingDone = false; fwLullFired = false; fwFountIdx = 0;
+    for (int i = 0; i < FW_MAX_PEND; i++)      fwPend[i].active = false;
+    for (int i = 0; i < FW_MAX_BURSTS; i++)    fwBursts[i].until = 0;
+    for (int i = 0; i < FW_MAX_FOUNTAINS; i++) fwFounts[i].active = false;
   }
 
   fwSchedule(showMs);
   fwPopPending(showMs);
+  fwUpdateFountains(showMs);
   fwUpdateShells(dt, showMs);
   fwUpdateStars(dt);
 
@@ -580,7 +634,7 @@ void fireworks() {
     if (s.life <= 0.0f || s.trail != 0) continue;
     if (s.flags & FW_SF_STROBE) {                       // 3-8 Hz per-star blink
       uint32_t ms = (uint32_t)(s.age * 1000.0f) + s.strobeOff;
-      if ((ms % s.strobePer) >= (uint32_t)(s.strobePer * 2 / 5)) continue;
+      if ((ms % s.strobePer) >= (uint32_t)(s.strobePer / 2)) continue;   // 50% duty
     }
     fwPlot((int)(s.x + 0.5f), (int)(s.y + 0.5f), fwStarColour(s, s.col));
   }
