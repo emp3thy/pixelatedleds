@@ -129,10 +129,12 @@ static inline void fwPlot(int x, int y, const CRGB& c) {
     leds[XY((uint8_t)x, (uint8_t)y)] += c;
 }
 
-// quadratic life fade b=(1-t/T)^2 + ember colour shift in the last 20%
+// full brightness for the first 30% of life, then quadratic fade
+// b=(1-u)^2 + ember colour shift in the last 20%
 static CRGB fwStarColour(const FwStar& s, const CRGB& base) {
   float t = s.age / s.life; if (t > 1.0f) t = 1.0f;
-  float b = (1.0f - t) * (1.0f - t);
+  float b = 1.0f;
+  if (t > 0.3f) { float u = (t - 0.3f) / 0.7f; b = (1.0f - u) * (1.0f - u); }
   CRGB c = base;
   if (t > 0.8f) c = blend(c, FW_C_EMBER, (uint8_t)((t - 0.8f) * 5.0f * 255.0f));
   c.nscale8_video((uint8_t)(b * 255.0f));
@@ -170,7 +172,7 @@ static void fwMine(float x, CRGB col) {
     float ang = -FW_TWO_PI / 4.0f + ((float)i / 7.0f - 0.5f) * 1.2f;
     float v = (38.0f + fwRandF() * 14.0f);
     fwSpawnStar(x, FW_GROUND_Y, cosf(ang) * v, sinf(ang) * v,
-                col, col, 0.75f * fwJit(), 170, 0, 1.0f, 0);
+                col, col, 0.75f * fwJit(), 210, 0, 1.0f, 0);
   }
 }
 
@@ -193,7 +195,7 @@ static void fwBurst(float x, float y, uint8_t type, CRGB col, CRGB col2, int32_t
       for (int i = 0; i < 18; i++) {
         float a = base + FW_TWO_PI * i / 18.0f, v = 30.0f * fwJit();
         CRGB tc = blend(col, FW_C_SILVER, 110);
-        fwSpawnStar(x, y, cosf(a) * v, sinf(a) * v, col, tc, 1.5f * fwJit(), 160, 0, 1.0f, 0);
+        fwSpawnStar(x, y, cosf(a) * v, sinf(a) * v, col, tc, 1.5f * fwJit(), 210, 0, 1.0f, 0);
       }
       break;
     case FW_DAHLIA:      // few big fast stars, largest radius
@@ -206,7 +208,7 @@ static void fwBurst(float x, float y, uint8_t type, CRGB col, CRGB col2, int32_t
       for (int i = 0; i < 14; i++) {
         float a = base + FW_TWO_PI * i / 14.0f, v = 19.0f * fwJit();
         fwSpawnStar(x, y, cosf(a) * v, sinf(a) * v, FW_C_GOLD, FW_C_GOLD,
-                    4.5f * fwJit(), 230, 0, 1.0f, 0);
+                    4.5f * fwJit(), 255, 0, 1.0f, 0);
       }
       break;
     case FW_PALM:        // 6 thick comet arms biased up/outward (fronds)
@@ -220,7 +222,7 @@ static void fwBurst(float x, float y, uint8_t type, CRGB col, CRGB col2, int32_t
       for (int i = 0; i < 5; i++) {
         float a = base + FW_TWO_PI * i / 5.0f, v = 28.0f * fwJit();
         fwSpawnStar(x, y, cosf(a) * v, sinf(a) * v, col, col,
-                    1.3f, 160, 0, 1.0f, (uint16_t)fwRandI(550, 700));
+                    1.3f, 210, 0, 1.0f, (uint16_t)fwRandI(550, 700));
       }
       break;
     case FW_RING:        // uniform expanding circle (no jitter) + pistil
@@ -549,8 +551,8 @@ void fireworks() {
   fwUpdateShells(dt, showMs);
   fwUpdateStars(dt);
 
-  // decay the persistent trail buffer (time-based, ~34/255 per 50 ms)
-  uint8_t fade = (uint8_t)fminf(255.0f, dt * 680.0f);
+  // decay the persistent trail buffer (time-based, ~28/255 per 50 ms)
+  uint8_t fade = (uint8_t)fminf(255.0f, dt * 560.0f);
   fadeToBlackBy(fwTrail, NUM_LEDS, fade);
 
   // stamp trailed particles into the trail buffer
